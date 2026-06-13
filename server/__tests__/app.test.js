@@ -1,9 +1,10 @@
-const request = require('supertest')
-const { app, resetState } = require('../src/app')
+import request from 'supertest'
+import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { app, resetState } from '../src/app.js'
 
 describe('RozWork API', () => {
-  beforeEach(() => {
-    resetState()
+  beforeEach(async () => {
+    await resetState()
   })
 
   it('returns health status', async () => {
@@ -45,7 +46,7 @@ describe('RozWork API', () => {
 
   it('seeds demo credentials for a fresh app instance', async () => {
     jest.resetModules()
-    const { app: freshApp } = require('../src/app')
+    const { app: freshApp } = await import('../src/app.js')
 
     const response = await request(freshApp).post('/api/auth/login').send({
       identifier: 'demo@rozwork.com',

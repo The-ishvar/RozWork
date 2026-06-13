@@ -5,7 +5,8 @@
   "description": "Root package for deploying the Roz backend on Render",
   "scripts": {
     "postinstall": "npm install --prefix server",
-    "start": "npm --prefix server start"
+    "start": "npm --prefix server start",
+    "mobile": "npm --prefix mobile start"
   },
   "engines": {
     "node": ">=20"

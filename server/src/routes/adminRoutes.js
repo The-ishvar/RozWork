@@ -1,5 +1,5 @@
-const express = require('express')
-const {
+import express from 'express'
+import {
   getUsers,
   getStats,
   getOverview,
@@ -16,8 +16,8 @@ const {
   getAuditHistory,
   submitModerationAction,
   bulkAction,
-} = require('../controllers/adminController')
-const { authenticate, authorizeRole } = require('../middleware/auth')
+} from '../controllers/adminController.js'
+import { authenticate, authorizeRole } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -41,4 +41,4 @@ router.get('/audit', ...superAdminOnly, getAuditHistory)
 router.post('/moderation', ...adminOnly, submitModerationAction)
 router.post('/bulk-action', ...adminOnly, bulkAction)
 
-module.exports = router
+export default router

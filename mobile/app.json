@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "RozWork",
+    "slug": "rozwork-mobile",
+    "scheme": "rozwork",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rozwork.mobile"
+    },
+    "android": {
+      "package": "com.rozwork.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      }
+    },
+    "extra": {
+      "apiUrl": "http://localhost:5000/api"
+    }
+  }
+}

@@ -100,13 +100,14 @@ const WorkersPage = () => {
     setPurchaseMessage('')
 
     try {
-      await purchaseService({
+      const result = await purchaseService({
         workerId: worker.id || worker.name,
         workerName: worker.name,
         workerProfession: worker.profession || 'Service',
         amount: worker.price || 500,
         service: worker.profession || 'Service',
       })
+      setPurchaseMessage(result?.message || 'Booking completed successfully.')
       navigate('/profile', { replace: true })
     } catch (error) {
       console.error(error)

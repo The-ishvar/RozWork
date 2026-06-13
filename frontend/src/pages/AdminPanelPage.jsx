@@ -26,8 +26,8 @@ const defaultSettings = {
   siteName: 'RozWork',
   logoUrl: '',
   bannerUrl: '',
-  contactEmail: 'hello@rozwork.com',
-  contactPhone: '+91 9660585691',
+  contactEmail: 'ishvar96@gmail.com',
+  contactPhone: ' 9660585691',
   socialLinks: 'https://linkedin.com, https://instagram.com',
 }
 

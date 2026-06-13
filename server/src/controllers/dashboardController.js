@@ -1,93 +1,61 @@
-const dataService = require('../services/dataService')
+import Booking from '../models/Booking.js'
+import Job from '../models/Job.js'
+import Purchase from '../models/Purchase.js'
+import Notification from '../models/Notification.js'
 
-const normalizeDate = (value) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toISOString().slice(0, 10)
-}
+export const getDashboardStats = async (req, res, next) => {
+  try {
+    const userId = req.user.id
+    const [jobs, bookings, purchases, notifications] = await Promise.all([
+      Job.find({ postedBy: userId }).sort({ createdAt: -1 }).lean(),
+      Booking.find({ userId }).sort({ createdAt: -1 }).lean(),
+      Purchase.find({ userId }).sort({ createdAt: -1 }).lean(),
+      Notification.find({ userId }).sort({ createdAt: -1 }).lean(),
+    ])
 
-const makeSeries = (items, keyName, days) => {
-  const now = new Date()
-  const buckets = []
-  for (let index = days - 1; index >= 0; index -= 1) {
-    const date = new Date(now)
-    date.setDate(now.getDate() - index)
-    const iso = date.toISOString().slice(0, 10)
-    buckets.push({ date: iso, [keyName]: 0 })
-  }
-
-  items.forEach((item) => {
-    const iso = normalizeDate(item.createdAt || item.created_on || item.date || item.joinDate)
-    if (!iso) return
-    const match = buckets.find((entry) => entry.date === iso)
-    if (match) {
-      match[keyName] += 1
+    const stats = {
+      totalJobsApplied: 0,
+      totalJobsPosted: jobs.length,
+      totalBookings: bookings.length,
+      totalReviews: 0,
+      activeJobs: jobs.filter((job) => job.status === 'approved').length,
+      pendingJobs: jobs.filter((job) => job.status === 'pending').length,
+      completedJobs: jobs.filter((job) => job.status === 'completed').length,
+      pendingBookings: bookings.filter((booking) => booking.status === 'pending').length,
+      confirmedBookings: bookings.filter((booking) => booking.status === 'confirmed').length,
+      completedBookings: bookings.filter((booking) => booking.status === 'completed').length,
+      cancelledBookings: bookings.filter((booking) => booking.status === 'cancelled').length,
     }
-  })
 
-  return buckets
-}
-
-const getDashboardStats = async (req, res) => {
-  const userId = req.user?.id
-  const [jobs, applications, purchases, reviews, allJobs] = await Promise.all([
-    dataService.getJobs(),
-    dataService.getApplicationsForUser(userId),
-    dataService.getPurchasesForUser(userId),
-    dataService.getReviews(),
-    dataService.getJobs(),
-  ])
-
-  const myJobs = allJobs.filter((job) => String(job.postedBy) === String(userId))
-  const myReviews = reviews.filter((review) => String(review.userId) === String(userId) || String(review.targetId) === String(userId))
-  const bookings = purchases || []
-
-  const stats = {
-    totalJobsApplied: applications.length,
-    totalJobsPosted: myJobs.length,
-    totalBookings: bookings.length,
-    totalReviews: myReviews.length,
-    activeJobs: myJobs.filter((job) => job.status === 'approved').length,
-    pendingJobs: myJobs.filter((job) => job.status === 'pending').length,
-    completedJobs: myJobs.filter((job) => job.status === 'completed').length,
-    expiredJobs: myJobs.filter((job) => job.status === 'expired').length,
-    pendingBookings: bookings.filter((booking) => String(booking.status || 'confirmed').toLowerCase() === 'pending').length,
-    confirmedBookings: bookings.filter((booking) => String(booking.status || 'confirmed').toLowerCase() === 'confirmed').length,
-    completedBookings: bookings.filter((booking) => String(booking.status || 'confirmed').toLowerCase() === 'completed').length,
-    cancelledBookings: bookings.filter((booking) => String(booking.status || 'confirmed').toLowerCase() === 'cancelled').length,
+    return res.json({ stats, recentJobs: jobs.slice(0, 5), recentBookings: bookings.slice(0, 5), recentPurchases: purchases.slice(0, 5), notifications })
+  } catch (error) {
+    console.error('dashboard.getDashboardStats failed', error)
+    next(error)
   }
-
-  const recentJobs = myJobs.slice().sort((left, right) => new Date(right.createdAt || right.postedAt || 0) - new Date(left.createdAt || left.postedAt || 0)).slice(0, 5)
-  const recentApplications = applications.slice().sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0)).slice(0, 5)
-  const recentBookings = bookings.slice().sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0)).slice(0, 5)
-  const recentReviews = myReviews.slice().sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0)).slice(0, 5)
-
-  const timeline = [...recentJobs.map((job) => ({ type: 'job', title: job.title || 'Job posted', createdAt: job.createdAt || new Date().toISOString() })), ...recentApplications.map((application) => ({ type: 'application', title: application.note || 'Application submitted', createdAt: application.createdAt || new Date().toISOString() })), ...recentBookings.map((booking) => ({ type: 'booking', title: booking.service || booking.workerName || 'Booking confirmed', createdAt: booking.createdAt || new Date().toISOString() })), ...recentReviews.map((review) => ({ type: 'review', title: review.comment || 'Review shared', createdAt: review.createdAt || new Date().toISOString() }))]
-    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
-    .slice(0, 10)
-
-  return res.json({ stats, recentJobs, recentApplications, recentBookings, recentReviews, timeline })
 }
 
-const getUserJobs = async (req, res) => {
-  const { id } = req.params
-  const jobs = await dataService.getJobs()
-  const userJobs = jobs.filter((job) => String(job.postedBy) === String(id))
-  return res.json({ jobs: userJobs })
+export const getUserJobs = async (req, res, next) => {
+  try {
+    const targetId = req.params.id || req.user.id
+    const jobs = await Job.find({ postedBy: targetId }).sort({ createdAt: -1 }).lean()
+    return res.json({ jobs })
+  } catch (error) {
+    console.error('dashboard.getUserJobs failed', error)
+    next(error)
+  }
 }
 
-const getUserBookings = async (req, res) => {
-  const { id } = req.params
-  const purchases = await dataService.getAllPurchases()
-  const bookings = purchases.filter((purchase) => String(purchase.userId) === String(id))
-  return res.json({ bookings })
+export const getUserBookings = async (req, res, next) => {
+  try {
+    const targetId = req.params.id || req.user.id
+    const bookings = await Booking.find({ userId: targetId }).sort({ createdAt: -1 }).lean()
+    return res.json({ bookings })
+  } catch (error) {
+    console.error('dashboard.getUserBookings failed', error)
+    next(error)
+  }
 }
 
-const getUserReviews = async (req, res) => {
-  const { id } = req.params
-  const reviews = await dataService.getReviews()
-  const userReviews = reviews.filter((review) => String(review.userId) === String(id) || String(review.targetId) === String(id))
-  return res.json({ reviews: userReviews })
-}
+export const getUserReviews = async (_req, res) => res.json({ reviews: [] })
 
-module.exports = { getDashboardStats, getUserJobs, getUserBookings, getUserReviews }
+export default { getDashboardStats, getUserJobs, getUserBookings, getUserReviews }

@@ -69,7 +69,7 @@ const AdminLoginPage = () => {
                label={t('admin.identifier')}
                name="identifier"
                type="text"
-               placeholder="9876543210 or you@example.com"
+               placeholder="966058569x or you@example.com"
                autoComplete="username"
                register={register}
                errors={errors}

@@ -566,141 +566,15 @@
       "purchases": [],
       "joinDate": "2026-06-12T07:39:27.856Z",
       "createdAt": "2026-06-12T07:39:27.856Z"
+    },
+    {
+      "id": "user_1781327856806",
+      "name": "ishvar suthar",
+      "email": "is1034016@gmail.com",
+      "password": "$2b$10$f3p03eF.N8p9.QHuVhwW7OiJlws7J2KbAKxYL30./PfTZ640YGJ7.",
+      "role": "worker",
+      "createdAt": "2026-06-13T05:17:36.806Z",
+      "data": {}
     }
-  ],
-  "jobs": [
-    {
-      "id": "job_1781249966805_ehdtuo",
-      "title": "Farm Labour Support for Harvesting",
-      "category": "Farm Labour",
-      "location": "Nashik, India",
-      "salary": "₹400/day",
-      "description": "Help with harvesting, field clearing, and crop handling for a local farm.",
-      "goalTags": [
-        "flexible-hours"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_jzwqih",
-      "title": "Skilled Plumbing Repair",
-      "category": "Skilled Trades",
-      "location": "Delhi, India",
-      "salary": "₹900/day",
-      "description": "Install and repair water lines and plumbing fixtures in a residential building.",
-      "goalTags": [
-        "skill-growth",
-        "quick-income"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_b8sou0",
-      "title": "Local Delivery Driver",
-      "category": "Drivers",
-      "location": "Pune, India",
-      "salary": "₹700/day",
-      "description": "Drive local routes and deliver parcels for a busy logistics partner.",
-      "goalTags": [
-        "quick-income",
-        "flexible-hours"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_hq2rg0",
-      "title": "House Cleaning and Home Helper",
-      "category": "House Helpers",
-      "location": "Mumbai, India",
-      "salary": "₹500/day",
-      "description": "Support daily house cleaning, laundry, and kitchen maintenance for a family.",
-      "goalTags": [
-        "quick-income",
-        "flexible-hours"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_3k1hld",
-      "title": "Student Internship for Digital Support",
-      "category": "Students",
-      "location": "Bangalore, India",
-      "salary": "₹300/day",
-      "description": "Assist with admin support, social media updates, and document handling.",
-      "goalTags": [
-        "flexible-hours",
-        "skill-growth"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_mhqyml",
-      "title": "Warehouse Packing Assistant",
-      "category": "House Helpers",
-      "location": "Ahmedabad, India",
-      "salary": "₹450/day",
-      "description": "Pack goods, load boxes, and support day-to-day warehouse operations.",
-      "goalTags": [
-        "quick-income"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_o0vr22",
-      "title": "Electrical Wiring for Small Office",
-      "category": "Skilled Trades",
-      "location": "Jaipur, India",
-      "salary": "₹950/day",
-      "description": "Wire a small office and fix damaged sockets and switches.",
-      "goalTags": [
-        "skill-growth",
-        "quick-income"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_5bgjvi",
-      "title": "Night Shift Cab Driver",
-      "category": "Drivers",
-      "location": "Chennai, India",
-      "salary": "₹800/day",
-      "description": "Drive customers safely during evening and night shifts.",
-      "goalTags": [
-        "quick-income"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_b3wkpc",
-      "title": "Garden and Farm Maintenance",
-      "category": "Farm Labour",
-      "location": "Mysuru, India",
-      "salary": "₹380/day",
-      "description": "Help with watering, soil prep, and general farm upkeep.",
-      "goalTags": [
-        "flexible-hours"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    },
-    {
-      "id": "job_1781249966805_jdr9ib",
-      "title": "Research Assistant Internship",
-      "category": "Students",
-      "location": "Hyderabad, India",
-      "salary": "₹350/day",
-      "description": "Support data entry, research notes, and reporting tasks for a startup.",
-      "goalTags": [
-        "skill-growth",
-        "flexible-hours"
-      ],
-      "createdAt": "2026-06-12T07:39:26.805Z"
-    }
-  ],
-  "applications": [],
-  "reviews": [],
-  "notifications": [],
-  "messages": [],
-  "payments": [],
-  "purchases": [],
-  "posts": []
+  ]
 }

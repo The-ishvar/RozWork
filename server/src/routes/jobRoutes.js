@@ -1,6 +1,6 @@
-const express = require('express')
-const { listJobs, createJob, getJobById, updateJob, deleteJob, applyToJob, getApplications } = require('../controllers/jobController')
-const { authenticate } = require('../middleware/auth')
+import express from 'express'
+import { listJobs, createJob, getJobById, updateJob, deleteJob, applyToJob, getApplications } from '../controllers/jobController.js'
+import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -13,4 +13,4 @@ router.delete('/:id', authenticate, deleteJob)
 router.post('/', authenticate, createJob)
 router.post('/:jobId/apply', authenticate, applyToJob)
 
-module.exports = router
+export default router

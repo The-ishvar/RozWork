@@ -1,6 +1,6 @@
-const express = require('express')
-const { authenticate } = require('../middleware/auth')
-const { getDashboardStats, getUserJobs, getUserBookings, getUserReviews } = require('../controllers/dashboardController')
+import express from 'express'
+import { authenticate } from '../middleware/auth.js'
+import { getDashboardStats, getUserJobs, getUserBookings, getUserReviews } from '../controllers/dashboardController.js'
 
 const router = express.Router()
 
@@ -9,4 +9,4 @@ router.get('/jobs/user/:id', authenticate, getUserJobs)
 router.get('/bookings/user/:id', authenticate, getUserBookings)
 router.get('/reviews/user/:id', authenticate, getUserReviews)
 
-module.exports = router
+export default router
