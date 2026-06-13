@@ -24,11 +24,22 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') })
 export const app = express()
 
 const allowedOrigins = [
+  'https://roz-work.vercel.app',
+  'https://www.roz-work.vercel.app',
   'https://roz-work-git-main-isvar-s-projects.vercel.app',
   'https://roz-1-xemo.onrender.com',
   'http://localhost:5173',
   'http://localhost:3000',
 ]
+
+app.use((req, _res, next) => {
+  console.info('[api-request]', {
+    method: req.method,
+    path: req.originalUrl,
+    origin: req.get('origin') || undefined,
+  })
+  next()
+})
 
 app.use(
   cors({
@@ -41,6 +52,8 @@ app.use(
       callback(null, false)
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 )
 app.use(express.json())

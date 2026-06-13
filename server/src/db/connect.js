@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 
 const DEFAULT_MONGO_URI = 'mongodb://127.0.0.1:27017/rozwork'
+let connectionPromise = null
 
 const resolveMongoUri = () => {
   const configuredUri = process.env.MONGODB_URI || process.env.MONGO_URI || process.env.MONGODB_URL || process.env.MONGO_URL
@@ -39,54 +40,67 @@ export const connectToDatabase = async () => {
     return mongoose.connection
   }
 
-  mongoose.set('bufferCommands', false)
-  mongoose.set('strictQuery', false)
-
-  mongoose.connection.removeAllListeners('connected')
-  mongoose.connection.removeAllListeners('error')
-  mongoose.connection.removeAllListeners('disconnected')
-
-  mongoose.connection.on('connected', () => {
-    console.log(`MongoDB connected to ${mongoose.connection.host}:${mongoose.connection.port}/${mongoose.connection.name}`)
-  })
-
-  mongoose.connection.on('error', (error) => {
-    console.error('MongoDB connection error:', error)
-  })
-
-  mongoose.connection.on('disconnected', () => {
-    console.warn('MongoDB disconnected')
-  })
-
-  const primaryUri = resolveMongoUri()
-  const candidateUris = [primaryUri]
-
-  if (!candidateUris.includes(DEFAULT_MONGO_URI)) {
-    candidateUris.push(DEFAULT_MONGO_URI)
+  if (connectionPromise) {
+    return connectionPromise
   }
 
-  let lastError
-  for (const mongoUri of candidateUris) {
-    try {
-      console.log(`Connecting to MongoDB at ${mongoUri.replace(/\/\/([^:@]+):([^@]+)@/, '//***:***@')}`)
-      const connection = await mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 10000,
-        connectTimeoutMS: 10000,
-        socketTimeoutMS: 20000,
-        maxPoolSize: 10,
-        retryWrites: true,
-        w: 'majority',
-      })
+  connectionPromise = (async () => {
+    mongoose.set('bufferCommands', false)
+    mongoose.set('strictQuery', false)
 
-      console.log(`MongoDB connection established: ${connection.connection.host}/${connection.connection.name}`)
-      return connection.connection
-    } catch (error) {
-      lastError = error
-      console.warn(`MongoDB connection failed for ${mongoUri}: ${error.message}`)
+    mongoose.connection.removeAllListeners('connected')
+    mongoose.connection.removeAllListeners('error')
+    mongoose.connection.removeAllListeners('disconnected')
+
+    mongoose.connection.on('connected', () => {
+      console.log(`MongoDB connected to ${mongoose.connection.host}:${mongoose.connection.port}/${mongoose.connection.name}`)
+    })
+
+    mongoose.connection.on('error', (error) => {
+      console.error('MongoDB connection error:', error)
+    })
+
+    mongoose.connection.on('disconnected', () => {
+      console.warn('MongoDB disconnected')
+    })
+
+    const primaryUri = resolveMongoUri()
+    const candidateUris = [primaryUri]
+
+    if (!candidateUris.includes(DEFAULT_MONGO_URI)) {
+      candidateUris.push(DEFAULT_MONGO_URI)
     }
-  }
 
-  throw lastError || new Error('Unable to connect to MongoDB')
+    let lastError
+    for (const mongoUri of candidateUris) {
+      try {
+        console.log(`Connecting to MongoDB at ${mongoUri.replace(/\/\/([^:@]+):([^@]+)@/, '//***:***@')}`)
+        await mongoose.connect(mongoUri, {
+          serverSelectionTimeoutMS: 10000,
+          connectTimeoutMS: 10000,
+          socketTimeoutMS: 20000,
+          maxPoolSize: 10,
+          retryWrites: true,
+          w: 'majority',
+        })
+
+        console.log(`MongoDB connection established: ${mongoose.connection.host}/${mongoose.connection.name}`)
+        return mongoose.connection
+      } catch (error) {
+        lastError = error
+        console.warn(`MongoDB connection failed for ${mongoUri}: ${error.message}`)
+      }
+    }
+
+    throw lastError || new Error('Unable to connect to MongoDB')
+  })()
+
+  try {
+    return await connectionPromise
+  } catch (error) {
+    connectionPromise = null
+    throw error
+  }
 }
 
 export const connectDB = connectToDatabase

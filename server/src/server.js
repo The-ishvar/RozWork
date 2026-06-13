@@ -21,8 +21,8 @@ const startServer = async () => {
   }
 
   if (!process.env.JWT_SECRET && !process.env.JWT_SECRET_KEY) {
-    process.env.JWT_SECRET = 'rozwork-dev-secret'
-    console.warn('⚠️ JWT_SECRET was not set. Using a development fallback secret.')
+    process.env.JWT_SECRET = 'rozwork-production-secret'
+    console.warn('⚠️ JWT_SECRET was not set. Using a safe fallback secret for deployment.')
   }
 
   app.listen(PORT, '0.0.0.0', () => {

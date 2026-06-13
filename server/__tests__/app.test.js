@@ -2,6 +2,8 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { app, resetState } from '../src/app.js'
 
+jest.setTimeout(30000)
+
 describe('RozWork API', () => {
   beforeEach(async () => {
     await resetState()

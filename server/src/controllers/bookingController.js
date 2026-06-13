@@ -1,4 +1,6 @@
 import Booking from '../models/Booking.js'
+import Notification from '../models/Notification.js'
+import User from '../models/User.js'
 
 const serializeBooking = (booking) => ({
   id: booking._id ? booking._id.toString() : booking.id,
@@ -47,6 +49,19 @@ export const createBooking = async (req, res, next) => {
       status: req.body.status || 'confirmed',
       paymentStatus: req.body.paymentStatus || 'paid',
     })
+
+    const adminUsers = await User.find({ role: { $in: ['admin', 'super_admin'] } }).lean()
+    console.log('[booking-notification]', { adminCount: adminUsers.length, userId: req.user.id, bookingId: booking._id?.toString() })
+    if (adminUsers.length > 0) {
+      await Promise.all(adminUsers.map((adminUser) => Notification.create({
+        userId: adminUser._id,
+        fromUserId: req.user.id,
+        type: 'booking',
+        title: 'New booking received',
+        message: `${req.user.name || 'A user'} booked ${booking.serviceTitle || 'a service'}.`,
+        relatedId: booking._id,
+      })))
+    }
 
     return res.status(201).json({ booking: serializeBooking(booking) })
   } catch (error) {
