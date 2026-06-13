@@ -3,8 +3,17 @@ import Constants from 'expo-constants'
 import * as SecureStore from 'expo-secure-store'
 
 const resolveApiBaseUrl = () => {
-  const configured = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api'
-  return configured.replace(/\/$/, '')
+  const configured = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL
+
+  if (configured) {
+    return configured.replace(/\/$/, '')
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://roz-1-xemo.onrender.com/api'
+  }
+
+  return 'http://localhost:5000/api'
 }
 
 const apiClient = axios.create({

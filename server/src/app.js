@@ -23,9 +23,23 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') })
 
 export const app = express()
 
+const allowedOrigins = [
+  'https://roz-work-git-main-isvar-s-projects.vercel.app',
+  'https://roz-1-xemo.onrender.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+]
+
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || /vercel\.app$/i.test(origin) || /localhost/i.test(origin)) {
+        callback(null, true)
+        return
+      }
+
+      callback(null, false)
+    },
     credentials: true,
   }),
 )

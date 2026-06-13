@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+const DEFAULT_API_URL = 'https://roz-1-xemo.onrender.com/api'
+
 const resolveApiBaseUrl = () => {
   const configuredUrl =
     import.meta.env.VITE_API_URL ||
@@ -7,6 +9,10 @@ const resolveApiBaseUrl = () => {
 
   if (configuredUrl) {
     return configuredUrl.replace(/\/$/, '')
+  }
+
+  if (import.meta.env.PROD) {
+    return DEFAULT_API_URL
   }
 
   if (typeof window !== 'undefined' && window.location?.origin) {
