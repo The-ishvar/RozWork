@@ -14,6 +14,7 @@ import {
   updateSettings,
   getNotifications,
   getAuditHistory,
+  getBookingTracking,
   submitModerationAction,
   bulkAction,
 } from '../controllers/adminController.js'
@@ -38,6 +39,7 @@ router.get('/settings', ...adminOnly, getSettings)
 router.put('/settings', ...adminOnly, updateSettings)
 router.get('/notifications', ...adminOnly, getNotifications)
 router.get('/audit', ...superAdminOnly, getAuditHistory)
+router.get('/bookings/tracking', ...superAdminOnly, getBookingTracking)
 router.post('/moderation', ...adminOnly, submitModerationAction)
 router.post('/bulk-action', ...adminOnly, bulkAction)
 

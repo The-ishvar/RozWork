@@ -11,10 +11,12 @@ import bookingRoutes from './routes/bookingRoutes.js'
 import notificationRoutes from './routes/notificationRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
 import dashboardRoutes from './routes/dashboardRoutes.js'
+import galleryRoutes from './routes/galleryRoutes.js'
 import User from './models/User.js'
 import Job from './models/Job.js'
 import Service from './models/Service.js'
 import Notification from './models/Notification.js'
+import GalleryItem from './models/GalleryItem.js'
 import { connectToDatabase, ensureDatabaseConnection } from './db/connect.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -121,6 +123,8 @@ app.use('/admin', adminRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/dashboard', dashboardRoutes)
 app.use('/api/dashboard', dashboardRoutes)
+app.use('/gallery', galleryRoutes)
+app.use('/api/gallery', galleryRoutes)
 
 let seedPromise = null
 
@@ -137,10 +141,11 @@ export const seedDefaultData = async () => {
     const adminEmail = 'admin@rozwork.com'
     const superAdminEmail = 'superadmin@rozwork.com'
 
-    const [existingServices, existingNotifications, existingJobs] = await Promise.all([
+    const [existingServices, existingNotifications, existingJobs, existingGalleryItems] = await Promise.all([
       Service.countDocuments(),
       Notification.countDocuments(),
       Job.countDocuments(),
+      GalleryItem.countDocuments(),
     ])
 
     const upsertUser = async (filter, values) => {
@@ -231,6 +236,33 @@ export const seedDefaultData = async () => {
         await Notification.create({ userId: admin._id, type: 'system', title: 'Welcome', message: 'RozWork is live and ready for bookings.' })
       }
     }
+
+    if (existingGalleryItems === 0) {
+      await GalleryItem.create([
+        {
+          title: 'Verified worker showcase',
+          description: 'A polished collection of completed jobs from trusted professionals in the RozWork network.',
+          category: 'Showcase',
+          imageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
+          imageAlt: 'Professional workers collaborating at a site',
+          location: 'Mumbai',
+          tags: ['verified', 'workers', 'portfolio'],
+          featured: true,
+          status: 'published',
+        },
+        {
+          title: 'On-site maintenance work',
+          description: 'High-trust service stories captured from recent bookings and approved completions.',
+          category: 'Maintenance',
+          imageUrl: 'https://images.unsplash.com/photo-1581092795360-fd1ca04f0952?auto=format&fit=crop&w=1200&q=80',
+          imageAlt: 'Technician performing maintenance work',
+          location: 'Delhi',
+          tags: ['maintenance', 'verification'],
+          featured: true,
+          status: 'published',
+        },
+      ])
+    }
   })()
 
   try {
@@ -251,6 +283,7 @@ export const resetState = async () => {
     Job.deleteMany({}),
     Service.deleteMany({}),
     Notification.deleteMany({}),
+    GalleryItem.deleteMany({}),
   ])
   await seedDefaultData()
 }

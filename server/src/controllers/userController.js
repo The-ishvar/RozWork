@@ -69,4 +69,36 @@ export const updateProfile = async (req, res, next) => {
   }
 }
 
-export default { updateProfile }
+export const updatePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body
+    const user = await User.findById(req.user.id)
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters long.' })
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'New password and confirmation do not match.' })
+    }
+
+    const isCurrentValid = await user.comparePassword(currentPassword)
+    if (!isCurrentValid) {
+      return res.status(401).json({ message: 'Current password is incorrect.' })
+    }
+
+    user.password = newPassword
+    await user.save()
+
+    return res.json({ success: true, message: 'Password updated successfully.' })
+  } catch (error) {
+    console.error('user.updatePassword failed', error)
+    next(error)
+  }
+}
+
+export default { updateProfile, updatePassword }

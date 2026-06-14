@@ -146,6 +146,66 @@ describe('RozWork API', () => {
     expect(meResponse.body.user.photo).toBe('https://example.com/sara.jpg')
   })
 
+  it('supports the booking lifecycle from pending to completed verification', async () => {
+    const employerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Rina',
+      email: 'rina@example.com',
+      password: 'secret123',
+      role: 'employer',
+    })
+
+    const workerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Aman',
+      email: 'aman@example.com',
+      password: 'secret123',
+      role: 'worker',
+    })
+
+    const bookingResponse = await request(app)
+      .post('/api/bookings')
+      .set('Authorization', `Bearer ${employerResponse.body.token}`)
+      .send({
+        workerId: workerResponse.body.user.id,
+        jobId: 'job_123',
+        price: 2500,
+        category: 'Electrician',
+        serviceTitle: 'Fan installation',
+      })
+
+    expect(bookingResponse.status).toBe(201)
+    expect(bookingResponse.body.booking.status).toBe('pending')
+
+    const acceptResponse = await request(app)
+      .patch(`/api/bookings/${bookingResponse.body.booking.id}/accept`)
+      .set('Authorization', `Bearer ${workerResponse.body.token}`)
+
+    expect(acceptResponse.status).toBe(200)
+    expect(acceptResponse.body.booking.status).toBe('accepted')
+
+    const completeResponse = await request(app)
+      .patch(`/api/bookings/${bookingResponse.body.booking.id}/complete`)
+      .set('Authorization', `Bearer ${workerResponse.body.token}`)
+
+    expect(completeResponse.status).toBe(200)
+    expect(completeResponse.body.booking.status).toBe('waiting_for_verification')
+
+    const verifyResponse = await request(app)
+      .patch(`/api/bookings/${bookingResponse.body.booking.id}/verify`)
+      .set('Authorization', `Bearer ${employerResponse.body.token}`)
+
+    expect(verifyResponse.status).toBe(200)
+    expect(verifyResponse.body.booking.status).toBe('completed')
+    expect(verifyResponse.body.payment).toBeTruthy()
+  })
+
+  it('returns gallery items through the public API', async () => {
+    const response = await request(app).get('/api/gallery')
+
+    expect(response.status).toBe(200)
+    expect(Array.isArray(response.body.gallery)).toBe(true)
+    expect(response.body.gallery.length).toBeGreaterThan(0)
+  })
+
   it('registers a new user', async () => {
     const response = await request(app).post('/api/auth/register').send({
       name: 'Asha',

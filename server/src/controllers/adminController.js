@@ -225,6 +225,36 @@ export const getNotifications = async (_req, res, next) => {
 
 export const getAuditHistory = async (_req, res) => res.json({ logs: getAuditLogs() })
 
+export const getBookingTracking = async (_req, res, next) => {
+  try {
+    const bookings = await Booking.find().sort({ createdAt: -1 }).lean()
+    const extended = await Promise.all(bookings.map(async (booking) => {
+      const [employer, worker] = await Promise.all([
+        User.findById(booking.employerId || booking.userId).lean(),
+        User.findById(booking.workerId || booking.providerId).lean(),
+      ])
+
+      return {
+        id: booking._id.toString(),
+        employerName: employer?.name || 'Unknown',
+        workerName: worker?.name || 'Unknown',
+        bookingDate: booking.createdAt,
+        amount: booking.amount || booking.price || 0,
+        status: booking.status,
+        verificationStatus: booking.verificationStatus || 'pending',
+        paymentStatus: booking.paymentStatus || 'pending',
+        completedAt: booking.completedAt || null,
+        category: booking.category || 'General',
+      }
+    }))
+
+    return res.json({ bookings: extended })
+  } catch (error) {
+    console.error('admin.getBookingTracking failed', error)
+    next(error)
+  }
+}
+
 export const submitModerationAction = async (req, res, next) => {
   try {
     const { action, type, id } = req.body
@@ -278,6 +308,7 @@ export default {
   updateSettings,
   getNotifications,
   getAuditHistory,
+  getBookingTracking,
   submitModerationAction,
   bulkAction,
 }

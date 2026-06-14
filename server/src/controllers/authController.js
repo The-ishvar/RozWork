@@ -92,14 +92,14 @@ export const register = async (req, res, next) => {
       return
     }
 
-    const { name, email, password, role = 'user', phone = '', username = '', serviceCategories = [], location = '', profession = '', ...rest } = req.body
+    const { name, email, password, role = 'user', phone, username = '', serviceCategories = [], location = '', profession = '', ...rest } = req.body
 
     if (!name || !password) {
       return res.status(400).json({ success: false, message: 'Name and password are required', code: 'VALIDATION_ERROR' })
     }
 
     const normalizedEmail = normalizeEmail(email)
-    const normalizedPhone = normalizePhone(phone)
+    const normalizedPhone = normalizePhone(phone) || undefined
     const normalizedUsername = normalizeUsername(username) || buildUsernameFromIdentity(name, email, phone)
     const resolvedEmail = normalizedEmail || buildEmailFromIdentity(name, normalizedPhone, normalizedUsername)
 
@@ -112,18 +112,23 @@ export const register = async (req, res, next) => {
       return res.status(409).json({ success: false, message: 'User already exists', code: 'USER_EXISTS' })
     }
 
-    const user = await User.create({
+    const userPayload = {
       name: String(name).trim(),
       email: resolvedEmail,
       password,
       role: ['admin', 'super_admin', 'worker', 'employer', 'user'].includes(role) ? role : 'user',
-      phone: normalizedPhone,
       username: normalizedUsername,
       serviceCategories: Array.isArray(serviceCategories) ? serviceCategories.filter(Boolean).map((item) => String(item).trim()).filter(Boolean) : [],
       location: String(location || '').trim(),
       profession: String(profession || '').trim(),
       ...rest,
-    })
+    }
+
+    if (normalizedPhone !== undefined) {
+      userPayload.phone = normalizedPhone
+    }
+
+    const user = await User.create(userPayload)
 
     addAuditLog({ type: 'auth', action: 'register', userId: user._id.toString(), message: `${user.name} registered` })
     await notifyAdmins({
