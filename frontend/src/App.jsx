@@ -10,6 +10,7 @@ import WorkersPage from './pages/WorkersPage'
 import ProfilePage from './pages/ProfilePage'
 import DashboardPage from './pages/DashboardPage'
 import AdminPanelPage from './pages/AdminPanelPage'
+import GalleryPage from './pages/GalleryPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { LanguageProvider } from './context/LanguageContext'
@@ -56,6 +57,7 @@ const AppRoutes = () => {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/workers" element={<WorkersPage />} />
+          <Route path="/gallery" element={<GalleryPage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminPanelPage /></AdminRoute>} />

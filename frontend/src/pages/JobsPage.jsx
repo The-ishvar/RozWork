@@ -46,7 +46,7 @@ const JobsPage = () => {
   const [jobs, setJobs] = useState([])
   const [selectedGoal, setSelectedGoal] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const { register, handleSubmit, reset } = useForm({ defaultValues: { workType: 'Full Time' } })
+  const { register, handleSubmit, reset } = useForm({ defaultValues: { workType: 'Full Time', category: '' } })
 
   const loadJobs = async () => {
     const { data } = await apiClient.get('/jobs')
@@ -63,7 +63,11 @@ const JobsPage = () => {
       title: values.title?.trim(),
       category: values.category?.trim(),
       location: values.location?.trim(),
-      salary: values.salary?.trim(),
+      salary: values.salary?.trim() || values.price?.trim() || values.budget?.trim() || '',
+      price: Number(values.price || values.salary || values.budget || 0),
+      budget: values.budget?.trim() || values.price?.trim() || values.salary?.trim() || '',
+      jobDate: values.jobDate?.trim() || '',
+      duration: values.duration?.trim() || '',
       description: values.description?.trim(),
       experienceRequired: values.experienceRequired?.trim(),
       contactNumber: values.contactNumber?.trim(),
@@ -72,7 +76,7 @@ const JobsPage = () => {
     }, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    reset({ workType: 'Full Time' })
+    reset({ workType: 'Full Time', category: '' })
     await loadJobs()
   }
 
@@ -122,7 +126,10 @@ const JobsPage = () => {
               {serviceCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
             <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.location', 'Location')} {...register('location', { required: true })} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.salary', 'Salary')} {...register('salary', { required: true })} />
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.price', 'Budget / Price')} {...register('price')} />
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.budget', 'Budget label')} {...register('budget')} />
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobDate', 'Preferred date')} type="date" {...register('jobDate')} />
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.duration', 'Duration')} {...register('duration')} />
             <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.experience', 'Experience required')} {...register('experienceRequired')} />
             <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.contact', 'Contact number')} {...register('contactNumber')} />
             <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('workType')}>
@@ -184,7 +191,7 @@ const JobsPage = () => {
                 <h3 className="mt-2 text-xl font-semibold text-slate-900">{job.title}</h3>
                 <p className="mt-2 text-sm text-slate-600">{job.description}</p>
               </div>
-              <div className="rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700">{job.salary}</div>
+              <div className="rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700">₹{job.price || job.salary || 0}</div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {getJobGoalTags(job).map((tag) => {
@@ -199,6 +206,8 @@ const JobsPage = () => {
             <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-slate-500">
               <span className="flex items-center gap-1"><MapPin size={16} /> {job.location}</span>
               <span className="flex items-center gap-1"><Sparkles size={16} /> {job.category}</span>
+              {job.jobDate ? <span>{job.jobDate}</span> : null}
+              {job.duration ? <span>{job.duration}</span> : null}
             </div>
             <button onClick={() => applyToJob(job.id)} className="mt-6 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">{t('jobs.applyNow')}</button>
           </div>

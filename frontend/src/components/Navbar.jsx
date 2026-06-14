@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, Briefcase, Home, LogOut, Menu, Moon, ShieldCheck, SunMedium, UserRound, Users, X } from 'lucide-react'
+import { Bell, Briefcase, Home, ImageIcon, LogOut, Menu, Moon, ShieldCheck, SunMedium, UserRound, Users, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -17,6 +17,7 @@ const Navbar = () => {
     { to: '/', label: t('nav.home'), icon: Home },
     { to: '/jobs', label: t('nav.jobs'), icon: Briefcase },
     { to: '/workers', label: t('nav.workers'), icon: Users },
+    { to: '/gallery', label: 'Gallery', icon: ImageIcon },
     { to: user ? '/dashboard' : '/login', label: user ? 'Notifications' : t('common.login'), icon: user ? Bell : UserRound },
     { to: user ? '/profile' : '/login', label: user ? 'Profile' : t('common.login'), icon: user ? UserRound : UserRound },
   ]
@@ -41,6 +42,7 @@ const Navbar = () => {
               <NavLink to="/" className="flex items-center gap-1 rounded-full px-3 py-2 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"> <Home size={16} /> {t('nav.home')}</NavLink>
               <NavLink to="/jobs" className="flex items-center gap-1 rounded-full px-3 py-2 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"> <Briefcase size={16} /> {t('nav.jobs')}</NavLink>
               <NavLink to="/workers" className="flex items-center gap-1 rounded-full px-3 py-2 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"> <Users size={16} /> {t('nav.workers')}</NavLink>
+              <NavLink to="/gallery" className="flex items-center gap-1 rounded-full px-3 py-2 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"> <ImageIcon size={16} /> Gallery</NavLink>
               {user ? <NavLink to="/dashboard" className="flex items-center gap-1 rounded-full px-3 py-2 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"> <Bell size={16} /> Notifications</NavLink> : null}
               {user ? <NavLink to="/profile" className="flex items-center gap-1 rounded-full px-3 py-2 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"> <UserRound size={16} /> Profile</NavLink> : null}
             </nav>
@@ -77,6 +79,7 @@ const Navbar = () => {
                 <NavLink to="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-white dark:hover:bg-slate-700"> <Home size={16} /> {t('nav.home')}</NavLink>
                 <NavLink to="/jobs" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-white dark:hover:bg-slate-700"> <Briefcase size={16} /> {t('nav.jobs')}</NavLink>
                 <NavLink to="/workers" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-white dark:hover:bg-slate-700"> <Users size={16} /> {t('nav.workers')}</NavLink>
+                <NavLink to="/gallery" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-white dark:hover:bg-slate-700"> <ImageIcon size={16} /> Gallery</NavLink>
                 {user ? <NavLink to="/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-white dark:hover:bg-slate-700"> <Bell size={16} /> Notifications</NavLink> : null}
                 {user ? <NavLink to="/profile" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-white dark:hover:bg-slate-700"> <UserRound size={16} /> Profile</NavLink> : null}
                 {user ? (

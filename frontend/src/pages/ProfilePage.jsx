@@ -1,60 +1,43 @@
+import { AnimatePresence, motion } from 'framer-motion'
+import { Briefcase, Camera, Edit3, Mail, MapPin, Phone, ShieldCheck, Sparkles, Wallet, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import {
-  BadgeCheck,
-  Briefcase,
-  Camera,
-  CheckCircle2,
-  Clock3,
-  Edit3,
-  FileText,
-  GraduationCap,
-  Mail,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  UploadCloud,
-  UserCircle2,
-  Wallet,
-  X,
-} from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
-const initialSkills = ['React', 'Tailwind CSS', 'Node.js']
-const initialExperience = [{ company: 'RozWork', position: 'Freelancer', startDate: '2024-01', endDate: 'Present', description: 'Delivered modern web experiences and platform support.' }]
-const initialEducation = [{ institution: 'Delhi University', degree: 'B.Tech', year: '2024' }]
-const initialAchievements = ['Top Rated Freelancer', 'Completed 50+ projects']
+const initialProfileState = {
+  name: '',
+  email: '',
+  phone: '',
+  profession: '',
+  location: '',
+  bio: '',
+  availability: 'Available now',
+  newSkill: '',
+  newAchievement: '',
+}
+
 const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Driver', 'Delivery Boy', 'Farmer', 'Labour', 'House Helper', 'Cleaner', 'Mechanic', 'AC Repair', 'Mobile Repair', 'Computer Repair', 'Tutor', 'Freelancer', 'Other']
 
 const ProfilePage = () => {
   const { user, updateProfile, token } = useAuth()
+  const [profile, setProfile] = useState(initialProfileState)
+  const [stats, setStats] = useState({ totalJobsPosted: 0, totalBookings: 0 })
   const [purchases, setPurchases] = useState([])
-  const [deletingPurchaseId, setDeletingPurchaseId] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState('')
-  const [message, setMessage] = useState('')
-  const [skills, setSkills] = useState(initialSkills)
   const [serviceCategories, setServiceCategories] = useState([])
-  const [newSkill, setNewSkill] = useState('')
-  const [experience, setExperience] = useState(initialExperience)
-  const [education, setEducation] = useState(initialEducation)
-  const [achievements, setAchievements] = useState(initialAchievements)
-  const [newAchievement, setNewAchievement] = useState('')
+  const [skills, setSkills] = useState(['React', 'Tailwind CSS', 'Node.js'])
+  const [experience, setExperience] = useState([{ company: '', position: '', startDate: '', endDate: '', description: '' }])
+  const [education, setEducation] = useState([{ institution: '', degree: '', year: '' }])
+  const [achievements, setAchievements] = useState(['Top Rated Freelancer'])
   const [portfolio, setPortfolio] = useState({ github: '', linkedin: '', website: '' })
   const [notifications, setNotifications] = useState({ email: true, sms: true, app: true })
-  const [stats, setStats] = useState({ totalJobsApplied: 0, totalJobsPosted: 0, totalBookings: 0, totalReviews: 0, activeJobs: 0, pendingJobs: 0, completedJobs: 0, pendingBookings: 0, confirmedBookings: 0, completedBookings: 0 })
-  const [recentJobs, setRecentJobs] = useState([])
-  const [recentApplications, setRecentApplications] = useState([])
-  const [recentBookings, setRecentBookings] = useState([])
-  const [recentReviews, setRecentReviews] = useState([])
-  const [timeline, setTimeline] = useState([])
-  const [quickAction, setQuickAction] = useState(null)
-  const [projectDraft, setProjectDraft] = useState({ title: '', link: '', description: '' })
-  const [certificateDraft, setCertificateDraft] = useState({ title: '', issuer: '', year: '' })
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [photoPreview, setPhotoPreview] = useState('')
   const [resumeDraft, setResumeDraft] = useState('')
-  const { register, handleSubmit, reset, setValue } = useForm({ mode: 'onBlur' })
+  const [message, setMessage] = useState('')
+  const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [focusMode, setFocusMode] = useState(false)
+  const [activeSection, setActiveSection] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const loadDashboardData = async () => {
     if (!user || !token) return
@@ -64,596 +47,313 @@ const ProfilePage = () => {
         apiClient.get('/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } }),
       ])
       setPurchases(purchasesResponse.data.purchases || [])
-      const payload = statsResponse.data || {}
-      setStats(payload.stats || {})
-      setRecentJobs(payload.recentJobs || [])
-      setRecentApplications(payload.recentApplications || [])
-      setRecentBookings(payload.recentBookings || [])
-      setRecentReviews(payload.recentReviews || [])
-      setTimeline(payload.timeline || [])
+      setStats(statsResponse.data?.stats || { totalJobsPosted: 0, totalBookings: 0 })
     } catch (error) {
       console.error(error)
-      setPurchases([])
     }
   }
 
   useEffect(() => {
     if (!user) return
     loadDashboardData()
-    reset({
+    setProfile({
       name: user.name || '',
-      username: user.username || '',
-      location: user.location || '',
-      phone: user.phone || '',
       email: user.email || '',
+      phone: user.phone || '',
       profession: user.profession || '',
+      location: user.location || '',
       bio: user.bio || '',
-      companyName: user.companyName || '',
-      businessDetails: user.businessDetails || '',
       availability: user.availability || 'Available now',
-      notificationsEnabled: user.notificationsEnabled ?? true,
-      privacyMode: user.privacyMode || 'Private profile',
+      newSkill: '',
+      newAchievement: '',
     })
     setPhotoPreview(user.photo || '')
-    setValue('photo', user.photo || '')
-    setSkills(Array.isArray(user.skills) && user.skills.length ? user.skills : initialSkills)
-    setServiceCategories(Array.isArray(user.serviceCategories) && user.serviceCategories.length ? user.serviceCategories : [])
-    setExperience(Array.isArray(user.experience) && user.experience.length ? user.experience : initialExperience)
-    setEducation(Array.isArray(user.education) && user.education.length ? user.education : initialEducation)
-    setPortfolio({
-      github: user.portfolio?.[0] || '',
-      linkedin: user.portfolio?.[1] || '',
-      website: user.portfolio?.[2] || '',
-    })
+    setServiceCategories(Array.isArray(user.serviceCategories) ? user.serviceCategories : [])
+    setSkills(Array.isArray(user.skills) && user.skills.length ? user.skills : skills)
+    setExperience(Array.isArray(user.experience) && user.experience.length ? user.experience : [{ company: '', position: '', startDate: '', endDate: '', description: '' }])
+    setEducation(Array.isArray(user.education) && user.education.length ? user.education : [{ institution: '', degree: '', year: '' }])
+    setAchievements(Array.isArray(user.certificates) && user.certificates.length ? user.certificates : achievements)
+    setPortfolio({ github: user.portfolio?.[0] || '', linkedin: user.portfolio?.[1] || '', website: user.portfolio?.[2] || '' })
     setResumeDraft(user.resumeUrl || '')
-  }, [user, reset, token])
+  }, [user, token])
+
+  const completionScore = useMemo(() => {
+    const checks = [Boolean(profile.name), Boolean(profile.email), Boolean(profile.phone), Boolean(profile.profession), Boolean(profile.location), skills.length > 0, experience.some((item) => item.company || item.position), education.some((item) => item.institution || item.degree), Boolean(photoPreview)]
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+  }, [education, experience, photoPreview, profile.email, profile.location, profile.name, profile.phone, profile.profession, skills])
 
   const handlePhotoUpload = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result
-      setPhotoPreview(result)
-      setValue('photo', result)
-    }
+    reader.onload = () => setPhotoPreview(reader.result)
     reader.readAsDataURL(file)
   }
 
-  const completionScore = useMemo(() => {
-    const checks = [
-      Boolean(user?.name),
-      Boolean(user?.email),
-      Boolean(user?.phone),
-      Boolean(user?.profession),
-      Boolean(user?.location),
-      skills.length > 0,
-      experience.length > 0,
-      education.length > 0,
-      Boolean(photoPreview),
-    ]
-    return Math.round((checks.filter(Boolean).length / checks.length) * 100)
-  }, [education.length, experience.length, photoPreview, skills.length, user?.email, user?.location, user?.name, user?.phone, user?.profession])
-
-  const onSubmit = async (values) => {
-    const payload = {
-      ...values,
-      name: values.name?.trim() || user?.name || '',
-      email: values.email?.trim() || user?.email || '',
-      phone: values.phone?.trim() || user?.phone || '',
-      location: values.location?.trim() || values.address?.trim() || user?.location || '',
-      bio: values.bio?.trim() || user?.bio || '',
-      profession: values.profession?.trim() || user?.profession || '',
-      photo: photoPreview || values.photo || '',
-      serviceCategories,
-      skills,
-      experience,
-      education,
-      certificates: Array.isArray(user?.certificates) ? user.certificates : [],
-      portfolio: [portfolio.github, portfolio.linkedin, portfolio.website].filter(Boolean),
-      socialLinks: [portfolio.github, portfolio.linkedin, portfolio.website].filter(Boolean),
-      notificationsEnabled: notifications.email || notifications.sms || notifications.app,
-      resumeUrl: resumeDraft,
-    }
-    await updateProfile(payload)
-    setMessage('Profile updated successfully and ready for the next opportunity.')
-    await loadDashboardData()
-  }
-
-  const handleDeletePurchase = async (purchaseId) => {
-    if (!token) return
-    setDeletingPurchaseId(purchaseId)
+  const handleSaveProfile = async () => {
+    if (!user || !token) return
     try {
-      const { data } = await apiClient.delete(`/purchases/${purchaseId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setPurchases(data.purchases || [])
-      setMessage('Booking removed from your profile.')
-    } catch (error) {
-      console.error(error)
-      setMessage('The booking could not be removed. Please try again.')
-    } finally {
-      setDeletingPurchaseId(null)
-    }
-  }
-
-  const saveQuickAction = async () => {
-    if (!token) return
-    try {
+      setLoading(true)
       const payload = {
+        name: profile.name.trim(),
+        email: profile.email.trim(),
+        phone: profile.phone.trim(),
+        profession: profile.profession.trim(),
+        location: profile.location.trim(),
+        bio: profile.bio.trim(),
+        availability: profile.availability.trim(),
+        photo: photoPreview || user.photo || '',
+        serviceCategories,
+        skills,
+        experience,
+        education,
+        achievements,
+        portfolio: [portfolio.github, portfolio.linkedin, portfolio.website].filter(Boolean),
+        socialLinks: [portfolio.github, portfolio.linkedin, portfolio.website].filter(Boolean),
+        notificationsEnabled: notifications.email || notifications.sms || notifications.app,
         resumeUrl: resumeDraft,
-        projects: Array.isArray(user?.projects) ? user.projects : [],
-        certificates: Array.isArray(user?.certificates) ? user.certificates : [],
       }
-
-      if (quickAction === 'project') {
-        payload.projects = [
-          ...(Array.isArray(user?.projects) ? user.projects : []),
-          { ...projectDraft, title: projectDraft.title.trim(), description: projectDraft.description.trim() },
-        ]
-      }
-
-      if (quickAction === 'certificate') {
-        payload.certificates = [
-          ...(Array.isArray(user?.certificates) ? user.certificates : []),
-          `${certificateDraft.title.trim()} • ${certificateDraft.issuer.trim()} • ${certificateDraft.year.trim()}`,
-        ]
-      }
-
       await updateProfile(payload)
-      setMessage(`${quickAction === 'resume' ? 'Resume link' : quickAction === 'project' ? 'Project' : 'Certificate'} saved successfully.`)
-      setQuickAction(null)
-      setProjectDraft({ title: '', link: '', description: '' })
-      setCertificateDraft({ title: '', issuer: '', year: '' })
+      setMessage('Profile updated successfully and ready for the next opportunity.')
       await loadDashboardData()
+      setIsEditorOpen(false)
     } catch (error) {
-      console.error(error)
-      setMessage('The quick action could not be saved. Please try again.')
+      setMessage('The profile could not be saved right now.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const addSkill = () => {
-    const value = newSkill.trim()
-    if (!value || skills.includes(value)) return
-    setSkills([...skills, value])
-    setNewSkill('')
+  const handlePasswordUpdate = async () => {
+    if (!token) return
+    try {
+      setLoading(true)
+      await apiClient.put('/users/password', passwords, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Password updated successfully.')
+      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to update the password right now.')
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const toggleServiceCategory = (category) => {
-    setServiceCategories((current) => current.includes(category) ? current.filter((item) => item !== category) : [...current, category])
-  }
-
-  const handleRemovePhoto = () => {
-    setPhotoPreview('')
-    setValue('photo', '')
-    setMessage('Profile photo removed. Save the form to persist the change.')
-  }
-
-  const handleQuickEdit = () => {
-    setQuickAction('edit')
-    setTimeout(() => {
-      document.getElementById('profile-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 50)
-  }
-
-  const removeSkill = (skill) => setSkills(skills.filter((entry) => entry !== skill))
-
-  const addExperience = () => {
-    setExperience([...experience, { company: '', position: '', startDate: '', endDate: '', description: '' }])
-  }
-
-  const updateExperience = (index, field, value) => {
-    const updated = [...experience]
-    updated[index][field] = value
-    setExperience(updated)
-  }
-
-  const removeExperience = (index) => setExperience(experience.filter((_, entryIndex) => entryIndex !== index))
-
-  const addEducation = () => {
-    setEducation([...education, { institution: '', degree: '', year: '' }])
-  }
-
-  const updateEducation = (index, field, value) => {
-    const updated = [...education]
-    updated[index][field] = value
-    setEducation(updated)
-  }
-
-  const removeEducation = (index) => setEducation(education.filter((_, entryIndex) => entryIndex !== index))
-
-  const addAchievement = () => {
-    const value = newAchievement.trim()
-    if (!value || achievements.includes(value)) return
-    setAchievements([...achievements, value])
-    setNewAchievement('')
-  }
-
-  const removeAchievement = (achievement) => setAchievements(achievements.filter((entry) => entry !== achievement))
 
   if (!user) return <div className="px-4 py-16 text-center text-slate-500">Please sign in to edit your profile.</div>
 
   return (
-    <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-8 dark:bg-slate-950">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-800 p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.14)] sm:p-8">
+    <div className={`min-h-screen px-4 py-8 transition-all duration-500 sm:px-6 lg:px-8 ${focusMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className={`rounded-[32px] border border-slate-200 p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-8 ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white/20 bg-white/10 text-2xl font-semibold shadow-lg">
-                  {photoPreview ? <img src={photoPreview} alt="Profile preview" className="h-full w-full object-cover" /> : user.name?.slice(0, 1).toUpperCase()}
-                </div>
-                <label className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-blue-500 text-white shadow-lg">
-                  <Camera size={16} />
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                </label>
-                {photoPreview ? (
-                  <button type="button" onClick={handleRemovePhoto} className="absolute left-0 top-0 rounded-full bg-slate-900/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
-                    Remove
-                  </button>
-                ) : null}
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-semibold text-white">
+                {photoPreview ? <img src={photoPreview} alt="Profile preview" className="h-full w-full object-cover" /> : user.name?.slice(0, 1).toUpperCase()}
               </div>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.32em] text-blue-200">Professional profile</p>
-                <h1 className="mt-2 text-3xl font-semibold">{user.name}</h1>
-                <p className="mt-2 text-sm text-slate-300">{user.profession || 'Modern professional'} • {user.location || 'Location not added yet'}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-200">
-                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{user.role === 'employer' ? 'Employer' : 'Worker'}</span>
-                  <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-emerald-200"><BadgeCheck size={14} className="mr-1 inline" /> Verified</span>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-semibold">{user.name}</h1>
+                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-emerald-700">Verified</span>
                 </div>
+                <p className={`mt-1 text-sm ${focusMode ? 'text-slate-300' : 'text-slate-500'}`}>{user.email}</p>
+                <p className={`mt-2 text-sm ${focusMode ? 'text-slate-300' : 'text-slate-500'}`}>{user.profession || 'Professional profile'}</p>
               </div>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
-              <div className="text-sm text-slate-300">Profile completion</div>
-              <div className="mt-2 flex items-center gap-3">
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/20">
-                  <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" style={{ width: `${completionScore}%` }} />
-                </div>
-                <span className="text-sm font-semibold">{completionScore}%</span>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-200">
-                <button type="button" onClick={handleQuickEdit} className="rounded-full bg-white/15 px-3 py-2">Edit profile</button>
-                <button type="button" onClick={() => setQuickAction('resume')} className="rounded-full bg-white/15 px-3 py-2">Upload resume</button>
-                <button type="button" onClick={() => setQuickAction('certificate')} className="rounded-full bg-white/15 px-3 py-2">Add certificate</button>
-              </div>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" onClick={() => setFocusMode((value) => !value)} className={`rounded-full border px-4 py-2 text-sm font-medium ${focusMode ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{focusMode ? 'Exit focus mode' : 'Focus mode'}</button>
+              <button type="button" onClick={() => { setActiveSection('personal'); setIsEditorOpen(true) }} className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
+                <Edit3 size={16} /> Edit profile
+              </button>
             </div>
           </div>
         </div>
 
-        {message ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: 'Jobs applied', value: stats.totalJobsApplied, icon: Briefcase },
-            { label: 'Jobs posted', value: stats.totalJobsPosted, icon: FileText },
-            { label: 'Bookings', value: stats.totalBookings, icon: Wallet },
-            { label: 'Reviews', value: stats.totalReviews, icon: TrendingUp },
-          ].map((item) => {
-            const Icon = item.icon
-            return (
-              <div key={item.label} className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                <div className="flex items-center gap-2 text-blue-600"><Icon size={18} /> {item.label}</div>
-                <p className="mt-4 text-3xl font-semibold text-slate-900">{item.value}</p>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-900">Career snapshot</h2>
-                <p className="mt-1 text-sm text-slate-500">Your live work activity, bookings, and profile momentum are grouped here.</p>
-              </div>
-              <div className="rounded-full bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">Live stats</div>
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-slate-900"><Briefcase size={16} /> Job posting status</div>
-                <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">Active: {stats.activeJobs}</span>
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">Pending: {stats.pendingJobs}</span>
-                  <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700">Completed: {stats.completedJobs}</span>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-slate-900"><Wallet size={16} /> Booking progress</div>
-                <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">Confirmed: {stats.confirmedBookings}</span>
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">Pending: {stats.pendingBookings}</span>
-                  <span className="rounded-full bg-slate-200 px-3 py-1 text-slate-700">Completed: {stats.completedBookings}</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-slate-900"><Clock3 size={16} /> Recent activity</div>
-              <div className="mt-3 space-y-2 text-sm text-slate-600">
-                {timeline.length ? timeline.map((item, index) => (
-                  <div key={`${item.type}-${index}`} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                    <span>{item.title}</span>
-                    <span className="text-xs uppercase tracking-[0.2em] text-slate-400">{item.type}</span>
-                  </div>
-                )) : <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-4 text-sm text-slate-500">Your latest activity will appear here as soon as you post a job, apply, or book a service.</div>}
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)]">
-            <div className="flex items-center gap-2 text-blue-600"><Sparkles size={18} /> Quick actions</div>
-            <div className="mt-4 space-y-3">
-              {[
-                { label: 'Edit profile', action: 'edit' },
-                { label: 'Upload resume', action: 'resume' },
-                { label: 'Add project', action: 'project' },
-                { label: 'Add certificate', action: 'certificate' },
-              ].map((entry) => (
-                <button key={entry.action} type="button" onClick={() => setQuickAction(entry.action)} className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 transition hover:border-blue-200 hover:bg-blue-50">
-                  <span>{entry.label}</span>
-                  <Edit3 size={14} className="text-blue-600" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Booked work</h2>
-              <p className="mt-1 text-sm text-slate-500">Your recent bookings and services appear here.</p>
-            </div>
-            <div className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">{purchases.length} booked</div>
-          </div>
-
-          {purchases.length ? (
-            <div className="mt-5 grid gap-3 lg:grid-cols-2">
-              {purchases.slice(0, 6).map((purchase) => (
-                <div key={purchase.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{purchase.workerName || purchase.service || 'Booked service'}</p>
-                      <p className="mt-1 text-sm text-slate-500">{purchase.workerProfession || purchase.service || 'Service booking'}</p>
-                    </div>
-                    <div className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">₹{purchase.amount || 0}</div>
-                  </div>
-                  <p className="mt-3 text-sm text-slate-600">{purchase.service || 'Confirmed booking'}</p>
-                  <button type="button" onClick={() => handleDeletePurchase(purchase.id)} disabled={deletingPurchaseId === purchase.id} className="mt-4 rounded-full border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
-                    {deletingPurchaseId === purchase.id ? 'Removing...' : 'Delete booking'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">No bookings yet. Browse workers and confirm a service to see it here.</div>
-          )}
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-          <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className={`rounded-[32px] border border-slate-200 p-6 shadow-sm sm:p-8 ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Complete your profile</h2>
-                <p className="mt-1 text-sm text-slate-500">Add the details that help you stand out professionally.</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-600">Professional profile</p>
+                <h2 className="mt-2 text-xl font-semibold">Your profile is ready for a premium marketplace experience.</h2>
               </div>
-              <div className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">{user.role}</div>
+              <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">{completionScore}% complete</div>
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Full Name</label>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('name')} />
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className={`rounded-2xl border border-slate-200 p-4 ${focusMode ? 'bg-white/10' : 'bg-slate-50'}`}>
+                <div className="flex items-center gap-2"><Briefcase size={16} /> Jobs</div>
+                <p className="mt-3 text-2xl font-semibold">{stats.totalJobsPosted || 0}</p>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Email</label>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('email')} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Phone Number</label>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('phone')} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Profession / Work Category</label>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('profession')} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Location</label>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('location')} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Availability</label>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('availability')} />
+              <div className={`rounded-2xl border border-slate-200 p-4 ${focusMode ? 'bg-white/10' : 'bg-slate-50'}`}>
+                <div className="flex items-center gap-2"><Wallet size={16} /> Bookings</div>
+                <p className="mt-3 text-2xl font-semibold">{stats.totalBookings || 0}</p>
               </div>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Bio</label>
-              <textarea className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" rows="3" {...register('bio')} placeholder="Share your experience, strengths, and what you offer." />
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-slate-900"><Sparkles size={16} /> Service categories</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {serviceCategoryOptions.map((category) => {
-                  const selected = serviceCategories.includes(category)
-                  return (
-                    <button key={category} type="button" onClick={() => toggleServiceCategory(category)} className={`rounded-full px-3 py-2 text-sm font-semibold transition ${selected ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 shadow-sm'}`}>
-                      {category}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-slate-900"><Sparkles size={16} /> Skills</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {skills.map((skill) => (
-                  <span key={skill} className="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm">
-                    {skill}
-                    <button type="button" onClick={() => removeSkill(skill)} className="text-slate-400"><X size={14} /></button>
-                  </span>
-                ))}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <input value={newSkill} onChange={(event) => setNewSkill(event.target.value)} className="min-w-[180px] rounded-full border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Add a skill" />
-                <button type="button" onClick={addSkill} className="rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Add skill</button>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-900"><Briefcase size={16} /> Experience</div>
-                <button type="button" onClick={addExperience} className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">Add experience</button>
-              </div>
-              <div className="mt-4 space-y-3">
-                {experience.map((item, index) => (
-                  <div key={`${item.company}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-3">
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <input value={item.company} onChange={(event) => updateExperience(index, 'company', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Company" />
-                      <input value={item.position} onChange={(event) => updateExperience(index, 'position', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Position" />
-                      <input value={item.startDate} onChange={(event) => updateExperience(index, 'startDate', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Start date" />
-                      <input value={item.endDate} onChange={(event) => updateExperience(index, 'endDate', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="End date" />
-                    </div>
-                    <textarea value={item.description} onChange={(event) => updateExperience(index, 'description', event.target.value)} className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Description" rows="2" />
-                    <button type="button" onClick={() => removeExperience(index)} className="mt-2 rounded-full border border-red-200 px-3 py-2 text-sm font-semibold text-red-600">Remove</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-900"><GraduationCap size={16} /> Education</div>
-                <button type="button" onClick={addEducation} className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">Add education</button>
-              </div>
-              <div className="mt-4 space-y-3">
-                {education.map((item, index) => (
-                  <div key={`${item.institution}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-3">
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <input value={item.institution} onChange={(event) => updateEducation(index, 'institution', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="School / College" />
-                      <input value={item.degree} onChange={(event) => updateEducation(index, 'degree', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Degree" />
-                      <input value={item.year} onChange={(event) => updateEducation(index, 'year', event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Year" />
-                    </div>
-                    <button type="button" onClick={() => removeEducation(index)} className="mt-2 rounded-full border border-red-200 px-3 py-2 text-sm font-semibold text-red-600">Remove</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-slate-900"><FileText size={16} /> Portfolio & resume</div>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <input value={portfolio.github} onChange={(event) => setPortfolio({ ...portfolio, github: event.target.value })} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="GitHub link" />
-                <input value={portfolio.linkedin} onChange={(event) => setPortfolio({ ...portfolio, linkedin: event.target.value })} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="LinkedIn link" />
-                <input value={portfolio.website} onChange={(event) => setPortfolio({ ...portfolio, website: event.target.value })} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Website link" />
-              </div>
-              <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                <UploadCloud size={16} /> Upload resume (PDF)
-                <input type="file" accept="application/pdf" className="hidden" />
-              </label>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-slate-900"><CheckCircle2 size={16} /> Achievements</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {achievements.map((achievement) => (
-                  <span key={achievement} className="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm">
-                    {achievement}
-                    <button type="button" onClick={() => removeAchievement(achievement)} className="text-slate-400"><X size={14} /></button>
-                  </span>
-                ))}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <input value={newAchievement} onChange={(event) => setNewAchievement(event.target.value)} className="min-w-[220px] rounded-full border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Add achievement or award" />
-                <button type="button" onClick={addAchievement} className="rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Add</button>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-slate-900"><Clock3 size={16} /> Notification settings</div>
-              <div className="mt-3 space-y-2">
-                {Object.entries(notifications).map(([key, value]) => (
-                  <label key={key} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                    <span className="capitalize">{key} notifications</span>
-                    <input type="checkbox" checked={value} onChange={() => setNotifications({ ...notifications, [key]: !value })} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button type="submit" className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-3 font-semibold text-white shadow-lg transition hover:translate-y-[-1px] hover:shadow-xl">
-                <UploadCloud size={16} /> Save profile
-              </button>
-              <button type="button" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Change password</button>
-            </div>
-          </form>
-
-          <div className="space-y-6">
-            <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)]">
-              <div className="flex items-center gap-2 text-blue-600"><ShieldCheck size={18} /> Security & privacy</div>
-              <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">Change password</div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">Change mobile number</div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">Two-factor authentication</div>
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)]">
-              <div className="flex items-center gap-2 text-slate-900"><UserCircle2 size={18} /> Profile details</div>
-              <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.2em] text-slate-400">Full name</div><div className="mt-1 font-medium text-slate-900">{user.name}</div></div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.2em] text-slate-400">Email</div><div className="mt-1 font-medium text-slate-900">{user.email}</div></div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.2em] text-slate-400">Mobile</div><div className="mt-1 font-medium text-slate-900">{user.phone || 'Add your phone'}</div></div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="text-xs uppercase tracking-[0.2em] text-slate-400">Account status</div><div className="mt-1 font-medium text-emerald-700">Verified • Active</div></div>
-              </div>
+          <div className={`rounded-[32px] border border-slate-200 p-6 shadow-sm sm:p-8 ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
+            <div className="flex items-center gap-2"><ShieldCheck size={16} /> Recent activity</div>
+            <div className="mt-6 space-y-4">
+              {purchases.length ? purchases.slice(0, 4).map((purchase) => (
+                <div key={purchase.id} className={`rounded-2xl border border-slate-200 p-3 ${focusMode ? 'bg-white/10' : 'bg-slate-50'}`}>
+                  <p className="font-semibold">{purchase.workerName || purchase.service || 'Service booking'}</p>
+                  <p className="mt-1 text-sm text-slate-500">₹{purchase.amount || 0}</p>
+                </div>
+              )) : <p className="text-sm text-slate-500">Your recent bookings will appear here.</p>}
             </div>
           </div>
         </div>
       </div>
 
-      {quickAction ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6">
-          <div className="w-full max-w-xl rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">{quickAction === 'resume' ? 'Upload resume' : quickAction === 'project' ? 'Add project' : quickAction === 'certificate' ? 'Add certificate' : 'Edit profile'}</h3>
-              <button type="button" onClick={() => setQuickAction(null)} className="rounded-full border border-slate-200 p-2 text-slate-500">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="mt-4 space-y-3">
-              {quickAction === 'resume' ? (
-                <>
-                  <label className="text-sm font-medium text-slate-700">Resume link</label>
-                  <input value={resumeDraft} onChange={(event) => setResumeDraft(event.target.value)} className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="https://..." />
-                </>
-              ) : null}
-              {quickAction === 'project' ? (
-                <>
-                  <input value={projectDraft.title} onChange={(event) => setProjectDraft({ ...projectDraft, title: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Project title" />
-                  <input value={projectDraft.link} onChange={(event) => setProjectDraft({ ...projectDraft, link: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Project link" />
-                  <textarea value={projectDraft.description} onChange={(event) => setProjectDraft({ ...projectDraft, description: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" rows="3" placeholder="Describe what you delivered" />
-                </>
-              ) : null}
-              {quickAction === 'certificate' ? (
-                <>
-                  <input value={certificateDraft.title} onChange={(event) => setCertificateDraft({ ...certificateDraft, title: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Certificate title" />
-                  <input value={certificateDraft.issuer} onChange={(event) => setCertificateDraft({ ...certificateDraft, issuer: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Issuer" />
-                  <input value={certificateDraft.year} onChange={(event) => setCertificateDraft({ ...certificateDraft, year: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Year" />
-                </>
-              ) : null}
-              {quickAction === 'edit' ? (
-                <p className="text-sm text-slate-600">You can update your main profile details in the form below, then save to refresh your details instantly.</p>
-              ) : null}
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setQuickAction(null)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
-              <button type="button" onClick={saveQuickAction} className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {isEditorOpen ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm">
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ duration: 0.25, ease: 'easeOut' }} className="absolute bottom-0 left-0 right-0 max-h-[92vh] overflow-y-auto rounded-t-[32px] bg-slate-50 p-4 shadow-2xl sm:p-6 lg:left-auto lg:right-4 lg:top-4 lg:bottom-4 lg:max-w-2xl lg:rounded-[32px]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-600">Edit profile</p>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-900">Craft your professional identity</h2>
+                </div>
+                <button type="button" onClick={() => setIsEditorOpen(false)} className="rounded-full bg-white p-2 shadow-sm">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-slate-900">Profile photo</p>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
+                      <Camera size={16} /> Upload
+                      <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                    </label>
+                  </div>
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-lg font-semibold text-slate-700">
+                      {photoPreview ? <img src={photoPreview} alt="Preview" className="h-full w-full object-cover" /> : user.name?.slice(0, 1).toUpperCase()}
+                    </div>
+                    <p className="text-sm text-slate-500">Upload a polished photo to make your profile feel premium and credible.</p>
+                  </div>
+                </div>
+
+                {['personal', 'categories', 'skills', 'experience', 'education', 'portfolio', 'resume', 'achievements', 'notifications', 'password'].map((section) => (
+                  <div key={section} className="rounded-[24px] border border-slate-200 bg-white p-4">
+                    <button type="button" onClick={() => setActiveSection((current) => current === section ? '' : section)} className="flex w-full items-center justify-between text-left">
+                      <span className="font-semibold text-slate-900">{section === 'personal' ? 'Personal details' : section === 'categories' ? 'Service categories' : section === 'skills' ? 'Skills' : section === 'experience' ? 'Experience' : section === 'education' ? 'Education' : section === 'portfolio' ? 'Portfolio' : section === 'resume' ? 'Resume' : section === 'achievements' ? 'Achievements' : section === 'notifications' ? 'Notification settings' : 'Password settings'}</span>
+                      <span className="text-sm text-slate-500">{activeSection === section ? 'Hide' : 'Show'}</span>
+                    </button>
+                    {activeSection === section ? (
+                      <div className="mt-4 space-y-4">
+                        {section === 'personal' ? (
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Full name" />
+                            <input value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Email" />
+                            <input value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Phone" />
+                            <input value={profile.profession} onChange={(event) => setProfile({ ...profile, profession: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Profession" />
+                            <input value={profile.location} onChange={(event) => setProfile({ ...profile, location: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Location" />
+                            <input value={profile.availability} onChange={(event) => setProfile({ ...profile, availability: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Availability" />
+                            <textarea value={profile.bio} onChange={(event) => setProfile({ ...profile, bio: event.target.value })} className="md:col-span-2 rounded-2xl border border-slate-200 px-4 py-3" rows="3" placeholder="Bio" />
+                          </div>
+                        ) : null}
+                        {section === 'categories' ? (
+                          <div className="flex flex-wrap gap-2">
+                            {serviceCategoryOptions.map((category) => (
+                              <button key={category} type="button" onClick={() => setServiceCategories((current) => current.includes(category) ? current.filter((item) => item !== category) : [...current, category])} className={`rounded-full px-3 py-2 text-sm font-medium ${serviceCategories.includes(category) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                                {category}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {section === 'skills' ? (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              {skills.map((skill) => <span key={skill} className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">{skill}</span>)}
+                            </div>
+                            <div className="flex gap-2">
+                              <input value={profile.newSkill} onChange={(event) => setProfile({ ...profile, newSkill: event.target.value })} className="flex-1 rounded-2xl border border-slate-200 px-4 py-3" placeholder="Add a skill" />
+                              <button type="button" onClick={() => { const value = profile.newSkill.trim(); if (!value) return; setSkills((current) => [...current, value]); setProfile({ ...profile, newSkill: '' }) }} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Add</button>
+                            </div>
+                          </div>
+                        ) : null}
+                        {section === 'experience' ? (
+                          <div className="space-y-3">
+                            {experience.map((entry, index) => (
+                              <div key={index} className="rounded-2xl border border-slate-200 p-3">
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  <input value={entry.company} onChange={(event) => { const updated = [...experience]; updated[index].company = event.target.value; setExperience(updated) }} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Company" />
+                                  <input value={entry.position} onChange={(event) => { const updated = [...experience]; updated[index].position = event.target.value; setExperience(updated) }} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Position" />
+                                  <input value={entry.startDate} onChange={(event) => { const updated = [...experience]; updated[index].startDate = event.target.value; setExperience(updated) }} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Start date" />
+                                  <input value={entry.endDate} onChange={(event) => { const updated = [...experience]; updated[index].endDate = event.target.value; setExperience(updated) }} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="End date" />
+                                  <textarea value={entry.description} onChange={(event) => { const updated = [...experience]; updated[index].description = event.target.value; setExperience(updated) }} className="md:col-span-2 rounded-2xl border border-slate-200 px-3 py-2" rows="2" placeholder="Description" />
+                                </div>
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => setExperience((current) => [...current, { company: '', position: '', startDate: '', endDate: '', description: '' }])} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Add experience</button>
+                          </div>
+                        ) : null}
+                        {section === 'education' ? (
+                          <div className="space-y-3">
+                            {education.map((entry, index) => (
+                              <div key={index} className="rounded-2xl border border-slate-200 p-3">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                  <input value={entry.institution} onChange={(event) => { const updated = [...education]; updated[index].institution = event.target.value; setEducation(updated) }} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Institution" />
+                                  <input value={entry.degree} onChange={(event) => { const updated = [...education]; updated[index].degree = event.target.value; setEducation(updated) }} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Degree" />
+                                  <input value={entry.year} onChange={(event) => { const updated = [...education]; updated[index].year = event.target.value; setEducation(updated) }} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Year" />
+                                </div>
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => setEducation((current) => [...current, { institution: '', degree: '', year: '' }])} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Add education</button>
+                          </div>
+                        ) : null}
+                        {section === 'portfolio' ? (
+                          <div className="grid gap-3">
+                            <input value={portfolio.github} onChange={(event) => setPortfolio({ ...portfolio, github: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="GitHub / portfolio link" />
+                            <input value={portfolio.linkedin} onChange={(event) => setPortfolio({ ...portfolio, linkedin: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="LinkedIn profile" />
+                            <input value={portfolio.website} onChange={(event) => setPortfolio({ ...portfolio, website: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Website" />
+                          </div>
+                        ) : null}
+                        {section === 'resume' ? <textarea value={resumeDraft} onChange={(event) => setResumeDraft(event.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3" rows="3" placeholder="Resume link or summary" /> : null}
+                        {section === 'achievements' ? (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              {achievements.map((achievement) => <span key={achievement} className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{achievement}</span>)}
+                            </div>
+                            <div className="flex gap-2">
+                              <input value={profile.newAchievement} onChange={(event) => setProfile({ ...profile, newAchievement: event.target.value })} className="flex-1 rounded-2xl border border-slate-200 px-4 py-3" placeholder="Add an achievement" />
+                              <button type="button" onClick={() => { const value = profile.newAchievement.trim(); if (!value) return; setAchievements((current) => [...current, value]); setProfile({ ...profile, newAchievement: '' }) }} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">Add</button>
+                            </div>
+                          </div>
+                        ) : null}
+                        {section === 'notifications' ? (
+                          <div className="space-y-3">
+                            {Object.entries(notifications).map(([key, value]) => (
+                              <label key={key} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
+                                <span className="text-sm font-medium text-slate-700">{key} notifications</span>
+                                <input type="checkbox" checked={value} onChange={() => setNotifications((current) => ({ ...current, [key]: !current[key] }))} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                              </label>
+                            ))}
+                          </div>
+                        ) : null}
+                        {section === 'password' ? (
+                          <div className="grid gap-3">
+                            <input type="password" value={passwords.currentPassword} onChange={(event) => setPasswords({ ...passwords, currentPassword: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Current password" />
+                            <input type="password" value={passwords.newPassword} onChange={(event) => setPasswords({ ...passwords, newPassword: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="New password" />
+                            <input type="password" value={passwords.confirmPassword} onChange={(event) => setPasswords({ ...passwords, confirmPassword: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Confirm password" />
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button type="button" onClick={() => setIsEditorOpen(false)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">Cancel</button>
+                  <button type="button" onClick={() => { if (activeSection === 'password') { void handlePasswordUpdate() } else { void handleSaveProfile() } }} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">{loading ? 'Saving...' : 'Save profile'}</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      {message ? <div className="mx-auto mt-4 max-w-6xl rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
     </div>
   )
 }
