@@ -16,14 +16,12 @@ import { LanguageProvider } from './context/LanguageContext'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
-
   if (loading) return <div className="px-4 py-16 text-center text-slate-500">Loading your workspace...</div>
   return user ? children : <Navigate to="/login" replace />
 }
 
 const PublicRoute = ({ children }) => {
   const { user, loading, token } = useAuth()
-
   if (loading) return <div className="px-4 py-16 text-center text-slate-500">Loading your workspace...</div>
   return token || user ? <Navigate to="/dashboard" replace /> : children
 }
