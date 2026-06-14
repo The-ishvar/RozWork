@@ -46,7 +46,7 @@ const AppRoutes = () => {
   const { theme } = useTheme()
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`min-h-screen pb-24 transition-colors duration-300 md:pb-0 ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       <BrowserRouter>
         <Navbar />
         <Routes>

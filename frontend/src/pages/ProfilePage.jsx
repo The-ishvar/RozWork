@@ -27,6 +27,7 @@ const initialSkills = ['React', 'Tailwind CSS', 'Node.js']
 const initialExperience = [{ company: 'RozWork', position: 'Freelancer', startDate: '2024-01', endDate: 'Present', description: 'Delivered modern web experiences and platform support.' }]
 const initialEducation = [{ institution: 'Delhi University', degree: 'B.Tech', year: '2024' }]
 const initialAchievements = ['Top Rated Freelancer', 'Completed 50+ projects']
+const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Driver', 'Delivery Boy', 'Farmer', 'Labour', 'House Helper', 'Cleaner', 'Mechanic', 'AC Repair', 'Mobile Repair', 'Computer Repair', 'Tutor', 'Freelancer', 'Other']
 
 const ProfilePage = () => {
   const { user, updateProfile, token } = useAuth()
@@ -35,6 +36,7 @@ const ProfilePage = () => {
   const [photoPreview, setPhotoPreview] = useState('')
   const [message, setMessage] = useState('')
   const [skills, setSkills] = useState(initialSkills)
+  const [serviceCategories, setServiceCategories] = useState([])
   const [newSkill, setNewSkill] = useState('')
   const [experience, setExperience] = useState(initialExperience)
   const [education, setEducation] = useState(initialEducation)
@@ -81,10 +83,11 @@ const ProfilePage = () => {
     reset({
       name: user.name || '',
       username: user.username || '',
-      address: user.address || '',
+      location: user.location || '',
       phone: user.phone || '',
       email: user.email || '',
       profession: user.profession || '',
+      bio: user.bio || '',
       companyName: user.companyName || '',
       businessDetails: user.businessDetails || '',
       availability: user.availability || 'Available now',
@@ -92,7 +95,9 @@ const ProfilePage = () => {
       privacyMode: user.privacyMode || 'Private profile',
     })
     setPhotoPreview(user.photo || '')
+    setValue('photo', user.photo || '')
     setSkills(Array.isArray(user.skills) && user.skills.length ? user.skills : initialSkills)
+    setServiceCategories(Array.isArray(user.serviceCategories) && user.serviceCategories.length ? user.serviceCategories : [])
     setExperience(Array.isArray(user.experience) && user.experience.length ? user.experience : initialExperience)
     setEducation(Array.isArray(user.education) && user.education.length ? user.education : initialEducation)
     setPortfolio({
@@ -133,13 +138,21 @@ const ProfilePage = () => {
   const onSubmit = async (values) => {
     const payload = {
       ...values,
+      name: values.name?.trim() || user?.name || '',
+      email: values.email?.trim() || user?.email || '',
+      phone: values.phone?.trim() || user?.phone || '',
+      location: values.location?.trim() || values.address?.trim() || user?.location || '',
+      bio: values.bio?.trim() || user?.bio || '',
+      profession: values.profession?.trim() || user?.profession || '',
       photo: photoPreview || values.photo || '',
+      serviceCategories,
       skills,
       experience,
       education,
       certificates: Array.isArray(user?.certificates) ? user.certificates : [],
       portfolio: [portfolio.github, portfolio.linkedin, portfolio.website].filter(Boolean),
       socialLinks: [portfolio.github, portfolio.linkedin, portfolio.website].filter(Boolean),
+      notificationsEnabled: notifications.email || notifications.sms || notifications.app,
       resumeUrl: resumeDraft,
     }
     await updateProfile(payload)
@@ -206,6 +219,23 @@ const ProfilePage = () => {
     setNewSkill('')
   }
 
+  const toggleServiceCategory = (category) => {
+    setServiceCategories((current) => current.includes(category) ? current.filter((item) => item !== category) : [...current, category])
+  }
+
+  const handleRemovePhoto = () => {
+    setPhotoPreview('')
+    setValue('photo', '')
+    setMessage('Profile photo removed. Save the form to persist the change.')
+  }
+
+  const handleQuickEdit = () => {
+    setQuickAction('edit')
+    setTimeout(() => {
+      document.getElementById('profile-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }
+
   const removeSkill = (skill) => setSkills(skills.filter((entry) => entry !== skill))
 
   const addExperience = () => {
@@ -257,6 +287,11 @@ const ProfilePage = () => {
                   <Camera size={16} />
                   <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
                 </label>
+                {photoPreview ? (
+                  <button type="button" onClick={handleRemovePhoto} className="absolute left-0 top-0 rounded-full bg-slate-900/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
+                    Remove
+                  </button>
+                ) : null}
               </div>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.32em] text-blue-200">Professional profile</p>
@@ -277,7 +312,7 @@ const ProfilePage = () => {
                 <span className="text-sm font-semibold">{completionScore}%</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-200">
-                <button type="button" onClick={() => setQuickAction('edit')} className="rounded-full bg-white/15 px-3 py-2">Edit profile</button>
+                <button type="button" onClick={handleQuickEdit} className="rounded-full bg-white/15 px-3 py-2">Edit profile</button>
                 <button type="button" onClick={() => setQuickAction('resume')} className="rounded-full bg-white/15 px-3 py-2">Upload resume</button>
                 <button type="button" onClick={() => setQuickAction('certificate')} className="rounded-full bg-white/15 px-3 py-2">Add certificate</button>
               </div>
@@ -395,7 +430,7 @@ const ProfilePage = () => {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
+          <form id="profile-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">Complete your profile</h2>
@@ -423,11 +458,30 @@ const ProfilePage = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Location</label>
-                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('address')} />
+                <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('location')} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Availability</label>
                 <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" {...register('availability')} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Bio</label>
+              <textarea className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" rows="3" {...register('bio')} placeholder="Share your experience, strengths, and what you offer." />
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center gap-2 text-slate-900"><Sparkles size={16} /> Service categories</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {serviceCategoryOptions.map((category) => {
+                  const selected = serviceCategories.includes(category)
+                  return (
+                    <button key={category} type="button" onClick={() => toggleServiceCategory(category)} className={`rounded-full px-3 py-2 text-sm font-semibold transition ${selected ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 shadow-sm'}`}>
+                      {category}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

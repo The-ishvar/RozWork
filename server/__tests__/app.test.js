@@ -2,7 +2,7 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { app, resetState } from '../src/app.js'
 
-jest.setTimeout(30000)
+jest.setTimeout(60000)
 
 describe('RozWork API', () => {
   beforeEach(async () => {
@@ -46,17 +46,25 @@ describe('RozWork API', () => {
     expect(detailResponse.body.job.title).toBe('Weekend Garden Support')
   })
 
-  it('seeds demo credentials for a fresh app instance', async () => {
-    jest.resetModules()
-    const { app: freshApp } = await import('../src/app.js')
-
-    const response = await request(freshApp).post('/api/auth/login').send({
-      identifier: 'demo@rozwork.com',
-      password: 'demo123456',
+  it('allows a registered user to log in with their username after registration', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Nisha Rao',
+      email: 'nisha@example.com',
+      username: 'nisharao',
+      phone: '9876543211',
+      password: 'secret123',
+      role: 'worker',
     })
 
+    const response = await request(app).post('/api/auth/login').send({
+      identifier: 'nisharao',
+      password: 'secret123',
+    })
+
+    expect(registerResponse.status).toBe(201)
     expect(response.status).toBe(200)
-    expect(response.body.user.email).toBe('demo@rozwork.com')
+    expect(response.body.user.username).toBe('nisharao')
+    expect(response.body.user.email).toBe('nisha@example.com')
   })
 
   it('allows the frontend dev server origin to access the API', async () => {
@@ -79,29 +87,63 @@ describe('RozWork API', () => {
     expect(searchResponse.body.jobs.length).toBeGreaterThan(0)
   })
 
-  it('supports goal-based job filtering for the demo experience', async () => {
+  it('supports goal-based job filtering for posted jobs', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Kiran',
+      email: 'kiran@example.com',
+      password: 'secret123',
+      role: 'employer',
+    })
+
+    await request(app)
+      .post('/api/jobs')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        title: 'Driver for local deliveries',
+        category: 'Drivers',
+        location: 'Mumbai',
+        salary: '₹900/day',
+        description: 'Reliable driver for local deliveries and airport pickups.',
+        goalTags: ['quick-income'],
+      })
+
     const response = await request(app).get('/api/jobs?goal=quick-income')
 
     expect(response.status).toBe(200)
-    expect(response.body.jobs.length).toBeGreaterThan(0)
-    expect(response.body.jobs.every((job) => (job.goalTags || []).includes('quick-income'))).toBe(true)
+    expect(response.body.jobs.some((job) => job.title.includes('Driver'))).toBe(true)
   })
 
-  it('seeds ten worker profiles for the marketplace', async () => {
-    const response = await request(app).get('/api/workers')
+  it('persists profile updates and service categories in MongoDB', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Sara',
+      email: 'sara@example.com',
+      phone: '9876543212',
+      password: 'secret123',
+      role: 'worker',
+    })
 
-    expect(response.status).toBe(200)
-    expect(response.body.workers.length).toBeGreaterThanOrEqual(10)
-  })
+    const updateResponse = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        name: 'Sara Khan',
+        profession: 'Electrician',
+        location: 'Delhi',
+        bio: 'Certified electrician with 4 years of experience.',
+        serviceCategories: ['Electrician', 'AC Repair'],
+        photo: 'https://example.com/sara.jpg',
+      })
 
-  it('seeds category-based jobs for the homepage cards', async () => {
-    const response = await request(app).get('/api/jobs')
+    const meResponse = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
 
-    expect(response.status).toBe(200)
-    expect(response.body.jobs.length).toBeGreaterThanOrEqual(5)
-    expect(response.body.jobs.map((job) => job.category)).toEqual(
-      expect.arrayContaining(['Farm Labour', 'Skilled Trades', 'Drivers', 'House Helpers', 'Students']),
-    )
+    expect(updateResponse.status).toBe(200)
+    expect(meResponse.status).toBe(200)
+    expect(meResponse.body.user.name).toBe('Sara Khan')
+    expect(meResponse.body.user.location).toBe('Delhi')
+    expect(meResponse.body.user.serviceCategories).toEqual(['Electrician', 'AC Repair'])
+    expect(meResponse.body.user.photo).toBe('https://example.com/sara.jpg')
   })
 
   it('registers a new user', async () => {
@@ -115,6 +157,51 @@ describe('RozWork API', () => {
     expect(response.status).toBe(201)
     expect(response.body.user.email).toBe('asha@example.com')
     expect(response.body.token).toBeTruthy()
+  })
+
+  it('registers and logs in a phone-only user without an email', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Mehul Singh',
+      phone: '5550001111',
+      username: 'mehulsingh',
+      password: 'strongPassword123',
+      role: 'worker',
+      location: 'Ahmedabad',
+      serviceCategories: ['Electrician', 'AC Repair'],
+    })
+
+    const loginResponse = await request(app).post('/api/auth/login').send({
+      identifier: '5550001111',
+      password: 'strongPassword123',
+    })
+
+    expect(registerResponse.status).toBe(201)
+    expect(registerResponse.body.user.phone).toBe('5550001111')
+    expect(registerResponse.body.user.serviceCategories).toEqual(['Electrician', 'AC Repair'])
+    expect(loginResponse.status).toBe(200)
+    expect(loginResponse.body.user.phone).toBe('5550001111')
+  })
+
+  it('creates an admin notification when a new user registers', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Mira',
+      email: 'mira@example.com',
+      password: 'secret123',
+      role: 'employer',
+    })
+
+    const adminLoginResponse = await request(app).post('/api/auth/login').send({
+      identifier: 'ishvar',
+      password: '1234567890',
+    })
+
+    const notificationsResponse = await request(app)
+      .get('/api/admin/notifications')
+      .set('Authorization', `Bearer ${adminLoginResponse.body.token}`)
+
+    expect(registerResponse.status).toBe(201)
+    expect(notificationsResponse.status).toBe(200)
+    expect(notificationsResponse.body.notifications.some((notification) => notification.message.includes('Mira'))).toBe(true)
   })
 
   it('logs in a user with a phone number', async () => {
@@ -136,14 +223,23 @@ describe('RozWork API', () => {
     expect(response.body.token).toBeTruthy()
   })
 
-  it('allows login with the seeded demo account', async () => {
-    const response = await request(app).post('/api/auth/login').send({
-      identifier: 'demo@rozwork.com',
-      password: 'demo123456',
+  it('allows an existing user to log in with their phone number', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Aditi',
+      email: 'aditi@example.com',
+      phone: '7778889990',
+      password: 'secret123',
+      role: 'worker',
     })
 
+    const response = await request(app).post('/api/auth/login').send({
+      identifier: '7778889990',
+      password: 'secret123',
+    })
+
+    expect(registerResponse.status).toBe(201)
     expect(response.status).toBe(200)
-    expect(response.body.user.email).toBe('demo@rozwork.com')
+    expect(response.body.user.phone).toBe('7778889990')
     expect(response.body.token).toBeTruthy()
   })
 

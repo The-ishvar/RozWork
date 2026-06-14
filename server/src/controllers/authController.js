@@ -4,10 +4,35 @@ import User from '../models/User.js'
 import Purchase from '../models/Purchase.js'
 import { addAuditLog } from '../utils/audit.js'
 import { ensureDatabaseConnection } from '../db/connect.js'
+import { notifyAdmins } from '../utils/notify.js'
 
 const otpStore = new Map()
 
 const getJwtSecret = () => process.env.JWT_SECRET || process.env.JWT_SECRET_KEY || 'rozwork-dev-secret'
+
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase()
+const normalizePhone = (value) => String(value || '').trim()
+const normalizeUsername = (value) => String(value || '').trim()
+
+const buildEmailFromIdentity = (name, phone, username) => {
+  const fallbackBase = normalizeUsername(username) || normalizePhone(phone) || String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '')
+  if (!fallbackBase) {
+    return ''
+  }
+
+  return `${fallbackBase}@rozwork.local`
+}
+
+const buildUsernameFromIdentity = (name, email, phone) => {
+  const source = normalizeUsername(name) || normalizeEmail(email) || normalizePhone(phone)
+  if (!source) {
+    return ''
+  }
+
+  return source.toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const createToken = (user) =>
   jwt.sign({ id: user._id.toString(), email: user.email, role: user.role }, getJwtSecret(), {
@@ -34,6 +59,7 @@ const serializeUser = (user, purchases = []) => ({
   email: user.email,
   phone: user.phone || '',
   username: user.username || '',
+  serviceCategories: user.serviceCategories || [],
   role: user.role,
   bio: user.bio || '',
   location: user.location || '',
@@ -66,29 +92,47 @@ export const register = async (req, res, next) => {
       return
     }
 
-    const { name, email, password, role = 'user', phone = '', username = '', ...rest } = req.body
+    const { name, email, password, role = 'user', phone = '', username = '', serviceCategories = [], location = '', profession = '', ...rest } = req.body
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email and password are required', code: 'VALIDATION_ERROR' })
+    if (!name || !password) {
+      return res.status(400).json({ success: false, message: 'Name and password are required', code: 'VALIDATION_ERROR' })
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase()
-    const existingUser = await User.findOne({ $or: [{ email: normalizedEmail }, ...(phone ? [{ phone }] : []), ...(username ? [{ username }] : [])] })
+    const normalizedEmail = normalizeEmail(email)
+    const normalizedPhone = normalizePhone(phone)
+    const normalizedUsername = normalizeUsername(username) || buildUsernameFromIdentity(name, email, phone)
+    const resolvedEmail = normalizedEmail || buildEmailFromIdentity(name, normalizedPhone, normalizedUsername)
+
+    if (!resolvedEmail) {
+      return res.status(400).json({ success: false, message: 'A valid email or phone number is required', code: 'VALIDATION_ERROR' })
+    }
+
+    const existingUser = await User.findOne({ $or: [{ email: resolvedEmail }, ...(normalizedPhone ? [{ phone: normalizedPhone }] : []), ...(normalizedUsername ? [{ username: normalizedUsername }] : [])] })
     if (existingUser) {
       return res.status(409).json({ success: false, message: 'User already exists', code: 'USER_EXISTS' })
     }
 
     const user = await User.create({
       name: String(name).trim(),
-      email: normalizedEmail,
+      email: resolvedEmail,
       password,
       role: ['admin', 'super_admin', 'worker', 'employer', 'user'].includes(role) ? role : 'user',
-      phone: String(phone).trim(),
-      username: String(username).trim() || normalizedEmail.split('@')[0],
+      phone: normalizedPhone,
+      username: normalizedUsername,
+      serviceCategories: Array.isArray(serviceCategories) ? serviceCategories.filter(Boolean).map((item) => String(item).trim()).filter(Boolean) : [],
+      location: String(location || '').trim(),
+      profession: String(profession || '').trim(),
       ...rest,
     })
 
     addAuditLog({ type: 'auth', action: 'register', userId: user._id.toString(), message: `${user.name} registered` })
+    await notifyAdmins({
+      type: 'registration',
+      title: 'New registration',
+      message: `${user.name} joined RozWork as ${user.role}.`,
+      relatedId: user._id,
+      fromUserId: user._id,
+    })
 
     const token = createToken(user)
     const purchases = await Purchase.find({ userId: user._id }).lean()
@@ -112,7 +156,7 @@ export const login = async (req, res, next) => {
     }
 
     const { identifier, email, password } = req.body
-    const loginIdentifier = identifier || email
+    const loginIdentifier = String(identifier || email || '').trim()
 
     console.log('auth.login input', {
       identifierPresent: identifier !== undefined && identifier !== null,
@@ -127,11 +171,12 @@ export const login = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Email and password are required', code: 'VALIDATION_ERROR' })
     }
 
+    const normalizedIdentifier = loginIdentifier.trim()
     const user = await User.findOne({
       $or: [
-        { email: String(loginIdentifier).trim().toLowerCase() },
-        { phone: String(loginIdentifier).trim() },
-        { username: String(loginIdentifier).trim() },
+        { email: normalizeEmail(normalizedIdentifier) },
+        { phone: normalizedIdentifier },
+        { username: { $regex: `^${escapeRegExp(normalizedIdentifier)}$`, $options: 'i' } },
       ],
     })
 
@@ -145,7 +190,7 @@ export const login = async (req, res, next) => {
     })
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found', code: 'USER_NOT_FOUND' })
+      return res.status(404).json({ success: false, message: 'We could not find an account with that email, phone, or username.', code: 'USER_NOT_FOUND' })
     }
 
     const isValidPassword = await user.comparePassword(password)
@@ -161,6 +206,13 @@ export const login = async (req, res, next) => {
     }
 
     addAuditLog({ type: 'auth', action: 'login', userId: user._id.toString(), message: `${user.name} logged in` })
+    await notifyAdmins({
+      type: 'login',
+      title: 'Member login',
+      message: `${user.name} signed in to RozWork.`,
+      relatedId: user._id,
+      fromUserId: user._id,
+    })
 
     const token = createToken(user)
     const purchases = await Purchase.find({ userId: user._id }).lean()

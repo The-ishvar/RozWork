@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Briefcase, MapPin, Sparkles } from 'lucide-react'
+
+const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Driver', 'Delivery Boy', 'Farmer', 'Labour', 'House Helper', 'Cleaner', 'Mechanic', 'AC Repair', 'Mobile Repair', 'Computer Repair', 'Tutor', 'Freelancer', 'Other']
+const workTypeOptions = ['Full Time', 'Part Time', 'Daily Wage', 'Contract', 'Temporary']
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -38,12 +41,12 @@ const matchesGoal = (job, selectedGoal) => {
 }
 
 const JobsPage = () => {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { t } = useLanguage()
   const [jobs, setJobs] = useState([])
   const [selectedGoal, setSelectedGoal] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const { register, handleSubmit, reset } = useForm()
+  const { register, handleSubmit, reset } = useForm({ defaultValues: { workType: 'Full Time' } })
 
   const loadJobs = async () => {
     const { data } = await apiClient.get('/jobs')
@@ -55,10 +58,21 @@ const JobsPage = () => {
   }, [])
 
   const onSubmit = async (values) => {
-    await apiClient.post('/jobs', values, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('rozwork_token')}` },
+    await apiClient.post('/jobs', {
+      ...values,
+      title: values.title?.trim(),
+      category: values.category?.trim(),
+      location: values.location?.trim(),
+      salary: values.salary?.trim(),
+      description: values.description?.trim(),
+      experienceRequired: values.experienceRequired?.trim(),
+      contactNumber: values.contactNumber?.trim(),
+      workType: values.workType?.trim() || 'Full Time',
+      postedByRole: user?.role || 'employer',
+    }, {
+      headers: { Authorization: `Bearer ${token}` },
     })
-    reset()
+    reset({ workType: 'Full Time' })
     await loadJobs()
   }
 
@@ -102,12 +116,20 @@ const JobsPage = () => {
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('jobs.postJob')}</h2>
           </div>
           <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobTitle')} {...register('title', { required: true })} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.category')} {...register('category', { required: true })} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.location')} {...register('location', { required: true })} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.salary')} {...register('salary', { required: true })} />
-            <textarea className="md:col-span-2 rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.description')} rows="4" {...register('description', { required: true })} />
-            <button className="md:col-span-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white">{t('jobs.publishJob')}</button>
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobTitle', 'Job Title')} {...register('title', { required: true })} />
+            <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('category', { required: true })}>
+              <option value="">{t('jobs.category', 'Select category')}</option>
+              {serviceCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.location', 'Location')} {...register('location', { required: true })} />
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.salary', 'Salary')} {...register('salary', { required: true })} />
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.experience', 'Experience required')} {...register('experienceRequired')} />
+            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.contact', 'Contact number')} {...register('contactNumber')} />
+            <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('workType')}>
+              {workTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+            <textarea className="md:col-span-2 rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.description', 'Description')} rows="4" {...register('description', { required: true })} />
+            <button className="md:col-span-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white">{t('jobs.publishJob', 'Publish job')}</button>
           </form>
         </div>
       ) : null}

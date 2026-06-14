@@ -3,6 +3,7 @@ import Booking from '../models/Booking.js'
 import Transaction from '../models/Transaction.js'
 import Notification from '../models/Notification.js'
 import User from '../models/User.js'
+import { notifyAdmins } from '../utils/notify.js'
 
 const serializePurchase = (purchase) => ({
   id: purchase._id ? purchase._id.toString() : purchase.id,
@@ -73,19 +74,13 @@ export const createPurchase = async (req, res, next) => {
       description: `Booking for ${service || workerName}`,
     })
 
-    const admins = await User.find({ role: { $in: ['admin', 'super_admin'] } })
-    await Promise.all(
-      admins.map((admin) =>
-        Notification.create({
-          userId: admin._id,
-          fromUserId: req.user.id,
-          type: 'booking',
-          title: 'New booking',
-          message: `${req.user.name} booked ${service || workerName}.`,
-          relatedId: booking._id,
-        }),
-      ),
-    )
+    await notifyAdmins({
+      type: 'booking',
+      title: 'New booking',
+      message: `${req.user.name} booked ${service || workerName}.`,
+      relatedId: booking._id,
+      fromUserId: req.user.id,
+    })
 
     if (providerId) {
       await Notification.create({

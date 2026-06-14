@@ -1,5 +1,6 @@
 import Job from '../models/Job.js'
 import Notification from '../models/Notification.js'
+import { notifyAdmins } from '../utils/notify.js'
 
 const normalizeGoal = (goal) => String(goal || '').trim().toLowerCase()
 
@@ -35,6 +36,9 @@ const serializeJob = (job) => ({
   location: job.location,
   salary: job.salary,
   description: job.description,
+  experienceRequired: job.experienceRequired || '',
+  contactNumber: job.contactNumber || '',
+  workType: job.workType || 'Full Time',
   postedBy: job.postedBy ? job.postedBy.toString() : '',
   postedByRole: job.postedByRole || 'employer',
   status: job.status,
@@ -73,11 +77,24 @@ export const createJob = async (req, res, next) => {
       location: req.body.location?.trim(),
       salary: req.body.salary?.trim(),
       description: req.body.description?.trim(),
+      experienceRequired: req.body.experienceRequired?.trim(),
+      contactNumber: req.body.contactNumber?.trim(),
+      workType: req.body.workType?.trim() || 'Full Time',
       postedBy: req.user?.id || req.body.postedBy || '',
       postedByRole: req.user?.role || req.body.postedByRole || 'employer',
       status: req.body.status || 'approved',
       goalTags: Array.isArray(req.body.goalTags) ? req.body.goalTags : [],
     })
+
+    const actorName = req.user?.name || req.body.postedByName || 'A member'
+    await notifyAdmins({
+      type: 'job',
+      title: 'New job posted',
+      message: `${actorName} posted a new opportunity: ${job.title}.`,
+      relatedId: job._id,
+      fromUserId: req.user?.id || null,
+    })
+
     return res.status(201).json({ job: serializeJob(job) })
   } catch (error) {
     console.error('jobs.create failed', error)
@@ -113,6 +130,9 @@ export const updateJob = async (req, res, next) => {
       location: req.body.location?.trim(),
       salary: req.body.salary?.trim(),
       description: req.body.description?.trim(),
+      experienceRequired: req.body.experienceRequired?.trim(),
+      contactNumber: req.body.contactNumber?.trim(),
+      workType: req.body.workType?.trim() || 'Full Time',
     }, { new: true, runValidators: true })
 
     return res.json({ job: serializeJob(job) })

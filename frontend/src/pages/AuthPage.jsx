@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Globe, Lock, Mail, Phone, ShieldCheck, Sparkles, User } from 'lucide-react'
+import { Lock, Mail, Phone, Sparkles, User } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthShell from '../components/AuthShell'
 import FormField from '../components/FormField'
@@ -52,12 +52,6 @@ const AuthPage = ({ mode = 'login' }) => {
     } catch (err) {
       setError(getErrorMessage(err))
     }
-  }
-
-  const handleGoogleLogin = async () => {
-    setError('')
-    setSuccess('')
-    setError(t('auth.googleComingSoonMessage', 'Google sign-in is not enabled in this build yet. Please use your mobile number or email and password instead.'))
   }
 
   return (
@@ -188,30 +182,30 @@ const AuthPage = ({ mode = 'login' }) => {
         )}
 
         {isRegister ? (
-          <FormField name="terms" type="checkbox" register={register} errors={errors} options={{ required: 'You must accept the terms' }}>
-            {t('auth.terms', 'I agree to the Terms & Conditions and Privacy Policy.')}
-          </FormField>
+          <div className="space-y-3">
+            <FormField name="terms" type="checkbox" register={register} errors={errors} options={{ required: 'You must accept the terms' }}>
+              {t('auth.terms', 'I agree to the Terms & Conditions and Privacy Policy.')}
+            </FormField>
+            <FormField name="rememberMe" type="checkbox" register={register} errors={errors} options={{}}>
+              {t('auth.rememberMe', 'Keep me signed in on this device')}
+            </FormField>
+          </div>
         ) : null}
 
         <button type="submit" disabled={isSubmitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 px-4 py-3 font-semibold text-white shadow-lg transition hover:translate-y-[-1px] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60">
           {isSubmitting ? t('auth.pleaseWait', 'Please wait...') : isRegister ? t('auth.createAccount', 'Create Account') : t('auth.logIn', 'Log In')}
         </button>
-
-        <button type="button" onClick={handleGoogleLogin} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 hover:shadow-md">
-          <Globe size={18} /> {t('auth.googleComingSoon')}
-        </button>
       </form>
 
-      <div className="mt-6 flex flex-col gap-2 text-center text-sm text-slate-500 sm:flex-row sm:justify-center">
-        <Link to="/admin/login" className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 font-semibold text-amber-700">
-          <ShieldCheck size={16} /> {t('auth.adminLogin')}
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <Link to={isRegister ? '/login' : '/register'} className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+          {isRegister ? t('auth.login') : t('auth.register')}
         </Link>
-        <p>
-          {isRegister ? t('auth.alreadyHaveAccount') : t('auth.dontHaveAccount')}{' '}
-          <Link to={isRegister ? '/login' : '/register'} className="font-semibold text-blue-600">
-            {isRegister ? t('auth.login') : t('auth.register')}
+        {!isRegister ? (
+          <Link to="/forgot-password" className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+            {t('auth.forgotPassword')}
           </Link>
-        </p>
+        ) : null}
       </div>
     </AuthShell>
   )

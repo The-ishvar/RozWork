@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Briefcase, BellRing, ShieldCheck, UserRound, Wallet } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BellRing, Briefcase, ShieldCheck, UserRound, Wallet } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -43,6 +44,21 @@ const DashboardPage = () => {
           </div>
           <div className="rounded-full bg-green-50 px-4 py-2 text-sm font-medium text-green-700">{user.role} account</div>
         </div>
+      </div>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Link to="/profile" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+          <div className="flex items-center gap-2 text-blue-600"><UserRound size={18} /> My Profile</div>
+          <p className="mt-4 text-sm text-slate-500">Keep your profile, photo, and service categories up to date.</p>
+        </Link>
+        <Link to="/jobs" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+          <div className="flex items-center gap-2 text-blue-600"><Briefcase size={18} /> My Jobs</div>
+          <p className="mt-4 text-sm text-slate-500">Post, manage, and track the opportunities you share with workers.</p>
+        </Link>
+        <Link to="/workers" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+          <div className="flex items-center gap-2 text-blue-600"><ShieldCheck size={18} /> My Bookings</div>
+          <p className="mt-4 text-sm text-slate-500">Review bookings, purchases, and recent activity in one place.</p>
+        </Link>
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-4">

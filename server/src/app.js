@@ -137,10 +137,10 @@ export const seedDefaultData = async () => {
     const adminEmail = 'admin@rozwork.com'
     const superAdminEmail = 'superadmin@rozwork.com'
 
-    const [existingJobs, existingServices, existingNotifications] = await Promise.all([
-      Job.countDocuments(),
+    const [existingServices, existingNotifications, existingJobs] = await Promise.all([
       Service.countDocuments(),
       Notification.countDocuments(),
+      Job.countDocuments(),
     ])
 
     const upsertUser = async (filter, values) => {
@@ -166,7 +166,7 @@ export const seedDefaultData = async () => {
           password: 'admin123456',
           role: 'admin',
           username: 'rozworkadmin',
-          phone: '9660585691',
+          phone: '9660585690',
           profession: 'Platform Administrator',
           bio: 'Administrator for RozWork operations.',
         },
@@ -179,7 +179,7 @@ export const seedDefaultData = async () => {
           password: '1234567890',
           role: 'admin',
           username: 'ishvar',
-          phone: '9660585691',
+          phone: '9660585692',
           profession: 'Admin Manager',
           bio: 'Admin account for RozWork operations.',
         },
@@ -197,48 +197,28 @@ export const seedDefaultData = async () => {
           bio: 'Super administrator for the RozWork control center.',
         },
       ),
-      upsertUser(
-        { email: 'demo@rozwork.com' },
-        {
-          name: 'Demo User',
-          email: 'demo@rozwork.com',
-          password: 'demo123456',
-          role: 'worker',
-          username: 'demo',
-          profession: 'Home Helper',
-          bio: 'Seeded demo account for product tours.',
-        },
-      ),
     ])
 
-    const existingWorkerCount = await User.countDocuments({ role: 'worker' })
-    if (existingWorkerCount < 10) {
-      const workerProfiles = [
-        { name: 'Asha Patel', email: 'asha@rozwork.com', password: 'worker123', role: 'worker', username: 'asha', profession: 'Home Helper', bio: 'Trusted home helper with 6 years of experience.', location: 'Mumbai', skills: ['cleaning', 'cooking', 'childcare'], ratings: 4.9, earnings: 700 },
-        { name: 'Ravi Kumar', email: 'ravi@rozwork.com', password: 'worker123', role: 'worker', username: 'ravi', profession: 'Driver', bio: 'Reliable driver for local deliveries and airport pickups.', location: 'Delhi', skills: ['driving', 'navigation'], ratings: 4.8, earnings: 900 },
-        { name: 'Meera Nair', email: 'meera@rozwork.com', password: 'worker123', role: 'worker', username: 'meera', profession: 'Cleaner', bio: 'Detail-oriented cleaner for homes and offices.', location: 'Bengaluru', skills: ['cleaning', 'sanitization'], ratings: 4.7, earnings: 650 },
-        { name: 'Jonas Dsouza', email: 'jonas@rozwork.com', password: 'worker123', role: 'worker', username: 'jonas', profession: 'Electrician', bio: 'Skilled electrician for quick repairs and installations.', location: 'Pune', skills: ['electrical', 'wiring'], ratings: 4.9, earnings: 1100 },
-        { name: 'Neha Sharma', email: 'neha@rozwork.com', password: 'worker123', role: 'worker', username: 'neha', profession: 'Plumber', bio: 'Fast plumbing repairs with transparent pricing.', location: 'Hyderabad', skills: ['plumbing', 'repair'], ratings: 4.8, earnings: 1000 },
-        { name: 'Suresh Bhatia', email: 'suresh@rozwork.com', password: 'worker123', role: 'worker', username: 'suresh', profession: 'Garden Helper', bio: 'Seasonal and regular gardening support.', location: 'Chandigarh', skills: ['gardening', 'watering'], ratings: 4.6, earnings: 600 },
-        { name: 'Kavita Rao', email: 'kavita@rozwork.com', password: 'worker123', role: 'worker', username: 'kavita', profession: 'Caretaker', bio: 'Dependable caretaker and household support.', location: 'Mumbai', skills: ['care', 'housekeeping'], ratings: 4.8, earnings: 750 },
-        { name: 'Arun Verma', email: 'arun@rozwork.com', password: 'worker123', role: 'worker', username: 'arun', profession: 'Painter', bio: 'Interior and exterior painting support.', location: 'Jaipur', skills: ['painting', 'finishing'], ratings: 4.7, earnings: 800 },
-        { name: 'Pooja Singh', email: 'pooja@rozwork.com', password: 'worker123', role: 'worker', username: 'pooja', profession: 'Tutor', bio: 'Flexible tutor for school subjects and exam prep.', location: 'Lucknow', skills: ['teaching', 'mentoring'], ratings: 4.9, earnings: 550 },
-        { name: 'Dinesh Shah', email: 'dinesh@rozwork.com', password: 'worker123', role: 'worker', username: 'dinesh', profession: 'Handyman', bio: 'Multi-skill handyman for minor fixes and installations.', location: 'Ahmedabad', skills: ['repair', 'assembly'], ratings: 4.8, earnings: 850 },
-      ]
-
-      await Promise.all(workerProfiles.map((profile) => upsertUser({ email: profile.email }, profile)))
-    }
-
     if (existingJobs === 0) {
-      const seedJobs = [
-        { title: 'Weekend Garden Support', category: 'Farm Labour', location: 'Lahore', salary: '₹800/day', description: 'Help with watering, harvesting, and basic garden maintenance.', goalTags: ['quick-income', 'flexible-hours'] },
-        { title: 'Skilled Plumbing Repair', category: 'Skilled Trades', location: 'Delhi', salary: '₹1200/day', description: 'Fast repair and maintenance work for homes and offices.', goalTags: ['skill-growth'] },
-        { title: 'Driver for Local Deliveries', category: 'Drivers', location: 'Mumbai', salary: '₹900/day', description: 'Reliable driver for local deliveries and pickups.', goalTags: ['quick-income'] },
-        { title: 'House Helper Support', category: 'House Helpers', location: 'Bangalore', salary: '₹700/day', description: 'Cleaning, cooking, and general support assistance.', goalTags: ['flexible-hours'] },
-        { title: 'Student Research Assistant', category: 'Students', location: 'Pune', salary: '₹500/day', description: 'Flexible support for research and admin tasks.', goalTags: ['skill-growth', 'flexible-hours'] },
-      ]
+      await Job.create({
+        title: 'Skilled Plumbing Repair',
+        category: 'Skilled Trades',
+        location: 'Delhi, India',
+        salary: '₹900/day',
+        description: 'Install and repair water lines and plumbing fixtures in a residential building.',
+        postedBy: null,
+        postedByRole: 'worker',
+      })
 
-      await Job.insertMany(seedJobs.map((job) => ({ ...job, postedByRole: 'employer', status: 'approved' })))
+      await Job.create({
+        title: 'Farm Labour Support for Harvesting',
+        category: 'Farm Labour',
+        location: 'Nashik, India',
+        salary: '₹400/day',
+        description: 'Help with harvesting, field clearing, and crop handling for a local farm.',
+        postedBy: null,
+        postedByRole: 'worker',
+      })
     }
 
     if (existingServices === 0) {
