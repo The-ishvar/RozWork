@@ -30,6 +30,7 @@ const userSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: true },
     isSuspended: { type: Boolean, default: false },
     isBanned: { type: Boolean, default: false },
+    lastActiveAt: { type: Date, default: Date.now },
   },
   { timestamps: true },
 )

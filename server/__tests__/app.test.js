@@ -46,6 +46,55 @@ describe('RozWork API', () => {
     expect(detailResponse.body.job.title).toBe('Weekend Garden Support')
   })
 
+  it('blocks regular users from creating job posts', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Ravi',
+      email: 'regular-user@example.com',
+      password: 'secret123',
+      role: 'user',
+    })
+
+    const createResponse = await request(app)
+      .post('/api/jobs/create')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        title: 'Unexpected Post',
+        category: 'General',
+        location: 'Lahore',
+        salary: '₹500/day',
+        description: 'This should be blocked.',
+      })
+
+    expect(createResponse.status).toBe(403)
+  })
+
+  it('creates a notification for the poster when a job is published', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Asha',
+      email: 'job-notify@example.com',
+      password: 'secret123',
+      role: 'employer',
+    })
+
+    await request(app)
+      .post('/api/jobs/create')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        title: 'Weekend Garden Support',
+        category: 'Farm Labour',
+        location: 'Lahore',
+        salary: '₹800/day',
+        description: 'Help with watering, harvesting, and basic garden maintenance.',
+      })
+
+    const notificationsResponse = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+
+    expect(notificationsResponse.status).toBe(200)
+    expect(notificationsResponse.body.notifications.some((notification) => notification.title === 'New job posted')).toBe(true)
+  })
+
   it('allows a registered user to log in with their username after registration', async () => {
     const registerResponse = await request(app).post('/api/auth/register').send({
       name: 'Nisha Rao',
@@ -488,5 +537,32 @@ describe('RozWork API', () => {
     expect(response.status).toBe(200)
     expect(Array.isArray(response.body.users)).toBe(true)
     expect(response.body.users.length).toBeGreaterThan(0)
+  })
+
+  it('records login history and exposes it to admins', async () => {
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Mina',
+      email: 'login-history@example.com',
+      password: 'secret123',
+      role: 'worker',
+    })
+
+    await request(app).post('/api/auth/login').send({
+      identifier: registerResponse.body.user.email,
+      password: 'secret123',
+    })
+
+    const adminLoginResponse = await request(app).post('/api/auth/login').send({
+      identifier: 'admin@rozwork.com',
+      password: 'admin123456',
+    })
+
+    const response = await request(app)
+      .get('/api/admin/login-history')
+      .set('Authorization', `Bearer ${adminLoginResponse.body.token}`)
+
+    expect(response.status).toBe(200)
+    expect(Array.isArray(response.body.logins)).toBe(true)
+    expect(response.body.logins.some((entry) => entry.email === 'login-history@example.com')).toBe(true)
   })
 })

@@ -1,6 +1,8 @@
 import Job from '../models/Job.js'
+import Booking from '../models/Booking.js'
 import Notification from '../models/Notification.js'
-import { notifyAdmins } from '../utils/notify.js'
+import { createNotification, notifyAdmins } from '../utils/notify.js'
+import { recordUserActivity } from '../utils/activity.js'
 
 const normalizeGoal = (goal) => String(goal || '').trim().toLowerCase()
 
@@ -27,6 +29,37 @@ const getGoalTags = (job = {}) => {
 const matchesGoalFilter = (job, goal) => {
   if (!goal) return true
   return getGoalTags(job).includes(goal)
+}
+
+const parseMoneyValue = (value) => {
+  const cleaned = String(value ?? '').trim().replace(/[^\d.]/g, '')
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const inferCategoryFromRequest = (payload = {}) => {
+  const explicitCategory = String(payload.category || '').trim()
+  if (explicitCategory) {
+    return explicitCategory
+  }
+
+  const haystack = `${payload.title || ''} ${payload.description || ''} ${payload.workType || ''}`.toLowerCase()
+  if (/(electric|electrical|wiring|fan|switch)/.test(haystack)) {
+    return 'Electrician'
+  }
+  if (/(plumb|pipe|tap|water|drain)/.test(haystack)) {
+    return 'Plumber'
+  }
+  if (/(carpenter|wood|furniture|door|window)/.test(haystack)) {
+    return 'Carpenter'
+  }
+  if (/(paint|wall|coating)/.test(haystack)) {
+    return 'Painter'
+  }
+  if (/(driver|delivery|transport|pickup)/.test(haystack)) {
+    return 'Driver'
+  }
+  return 'Other'
 }
 
 const serializeJob = (job) => ({
@@ -75,12 +108,16 @@ export const listJobs = async (req, res, next) => {
 
 export const createJob = async (req, res, next) => {
   try {
+    if (!['employer', 'admin', 'super_admin'].includes(req.user?.role)) {
+      return res.status(403).json({ message: 'Only employers and admins can publish jobs.' })
+    }
+
     const job = await Job.create({
       title: req.body.title?.trim(),
-      category: req.body.category?.trim(),
+      category: inferCategoryFromRequest(req.body),
       location: req.body.location?.trim(),
       salary: req.body.salary?.trim(),
-      price: Number(req.body.price ?? req.body.budget ?? req.body.salary ?? 0),
+      price: parseMoneyValue(req.body.price ?? req.body.budget ?? req.body.salary ?? 0),
       budget: req.body.budget?.trim() || req.body.salary?.trim() || '',
       jobDate: req.body.jobDate?.trim() || '',
       duration: req.body.duration?.trim() || '',
@@ -95,13 +132,37 @@ export const createJob = async (req, res, next) => {
     })
 
     const actorName = req.user?.name || req.body.postedByName || 'A member'
-    await notifyAdmins({
-      type: 'job',
-      title: 'New job posted',
-      message: `${actorName} posted a new opportunity: ${job.title}.`,
-      relatedId: job._id,
-      fromUserId: req.user?.id || null,
-    })
+    const actorId = req.user?.id || req.body.postedBy || null
+
+    await Promise.allSettled([
+      notifyAdmins({
+        type: 'job',
+        title: 'New job posted',
+        message: `${actorName} posted a new opportunity: ${job.title}.`,
+        relatedId: job._id,
+        fromUserId: actorId,
+      }),
+      actorId ? createNotification({
+        userId: actorId,
+        type: 'job',
+        title: 'New job posted',
+        message: `You posted a new opportunity: ${job.title}.`,
+        relatedId: job._id,
+        fromUserId: actorId,
+      }) : null,
+      recordUserActivity({
+        userId: actorId,
+        username: req.user?.email || req.body.postedByName || 'member',
+        fullName: actorName,
+        email: req.user?.email || '',
+        role: req.user?.role || req.body.postedByRole || 'employer',
+        action: 'job_created',
+        entityType: 'job',
+        entityId: job._id.toString(),
+        entityTitle: job.title,
+        details: 'Posted a new job',
+      }),
+    ])
 
     return res.status(201).json({ job: serializeJob(job) })
   } catch (error) {
@@ -131,13 +192,19 @@ export const updateJob = async (req, res, next) => {
       return res.status(404).json({ message: 'Job not found' })
     }
 
+    const isOwner = existingJob.postedBy?.toString() === req.user?.id
+    const isAdmin = ['admin', 'super_admin'].includes(req.user?.role)
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'You can only edit your own posts.' })
+    }
+
     const job = await Job.findByIdAndUpdate(req.params.id, {
       ...req.body,
       title: req.body.title?.trim(),
-      category: req.body.category?.trim(),
+      category: inferCategoryFromRequest({ ...existingJob.toObject(), ...req.body }),
       location: req.body.location?.trim(),
       salary: req.body.salary?.trim(),
-      price: Number(req.body.price ?? req.body.budget ?? req.body.salary ?? 0),
+      price: parseMoneyValue(req.body.price ?? req.body.budget ?? req.body.salary ?? 0),
       budget: req.body.budget?.trim() || req.body.salary?.trim() || '',
       jobDate: req.body.jobDate?.trim() || '',
       duration: req.body.duration?.trim() || '',
@@ -161,6 +228,12 @@ export const deleteJob = async (req, res, next) => {
       return res.status(404).json({ message: 'Job not found' })
     }
 
+    const isOwner = existingJob.postedBy?.toString() === req.user?.id
+    const isAdmin = ['admin', 'super_admin'].includes(req.user?.role)
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'You can only delete your own posts.' })
+    }
+
     await Job.findByIdAndDelete(req.params.id)
     return res.json({ message: 'Job deleted successfully' })
   } catch (error) {
@@ -181,12 +254,53 @@ export const applyToJob = async (req, res, next) => {
       await job.save()
     }
 
-    await Notification.create({
-      userId: job.postedBy,
-      type: 'application',
-      title: 'New application',
-      message: `A new application was submitted for ${job.title}.`,
-    })
+    const existingBooking = await Booking.findOne({ jobId: job._id.toString(), workerId: req.user.id, employerId: job.postedBy })
+    if (!existingBooking) {
+      await Booking.create({
+        employerId: job.postedBy,
+        workerId: req.user.id,
+        userId: req.user.id,
+        providerId: job.postedBy,
+        jobId: job._id.toString(),
+        serviceTitle: job.title,
+        serviceProvider: job.category || 'General',
+        amount: parseMoneyValue(job.price ?? job.salary ?? 0),
+        price: parseMoneyValue(job.price ?? job.salary ?? 0),
+        category: job.category || 'General',
+        status: 'pending',
+        paymentStatus: 'pending',
+        contactName: req.user.name,
+        contactEmail: req.user.email,
+        contactPhone: req.user.phone || '',
+        transactionId: `booking_${Date.now()}`,
+      })
+    }
+
+    await Promise.allSettled([
+      job.postedBy ? createNotification({
+        userId: job.postedBy,
+        type: 'application',
+        title: 'New application',
+        message: `A new application was submitted for ${job.title}.`,
+        relatedId: job._id,
+        fromUserId: req.user.id,
+      }) : null,
+      createNotification({
+        userId: req.user.id,
+        type: 'application',
+        title: 'Application submitted',
+        message: `You applied to ${job.title}.`,
+        relatedId: job._id,
+        fromUserId: job.postedBy,
+      }),
+      notifyAdmins({
+        type: 'application',
+        title: 'Job application',
+        message: `${req.user.name || 'A member'} applied for ${job.title}.`,
+        relatedId: job._id,
+        fromUserId: req.user.id,
+      }),
+    ])
 
     return res.status(201).json({ application: { jobId: job._id.toString(), userId: req.user.id, status: 'pending' } })
   } catch (error) {
@@ -213,4 +327,14 @@ export const getApplications = async (req, res, next) => {
   }
 }
 
-export default { listJobs, createJob, getJobById, updateJob, deleteJob, applyToJob, getApplications }
+export const getMyJobs = async (req, res, next) => {
+  try {
+    const jobs = await Job.find({ postedBy: req.user.id }).sort({ createdAt: -1 }).lean()
+    return res.json({ jobs: jobs.map(serializeJob) })
+  } catch (error) {
+    console.error('jobs.getMyJobs failed', error)
+    next(error)
+  }
+}
+
+export default { listJobs, createJob, getJobById, updateJob, deleteJob, applyToJob, getApplications, getMyJobs }

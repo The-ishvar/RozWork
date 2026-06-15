@@ -17,6 +17,8 @@ import Job from './models/Job.js'
 import Service from './models/Service.js'
 import Notification from './models/Notification.js'
 import GalleryItem from './models/GalleryItem.js'
+import LoginHistory from './models/LoginHistory.js'
+import UserActivity from './models/UserActivity.js'
 import { connectToDatabase, ensureDatabaseConnection } from './db/connect.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -284,6 +286,8 @@ export const resetState = async () => {
     Service.deleteMany({}),
     Notification.deleteMany({}),
     GalleryItem.deleteMany({}),
+    LoginHistory.deleteMany({}),
+    UserActivity.deleteMany({}),
   ])
   await seedDefaultData()
 }

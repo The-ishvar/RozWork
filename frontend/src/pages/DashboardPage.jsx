@@ -14,6 +14,8 @@ const DashboardPage = () => {
   const [earningsHistory, setEarningsHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
+  const profileIncomplete = Boolean(user) && (!user.name || !user.phone || !user.profession || !user.location || !user.bio || !user.skills?.length || !user.photo)
+
   const loadDashboard = async () => {
     if (!user || !token) return
     try {
@@ -35,7 +37,14 @@ const DashboardPage = () => {
   }
 
   useEffect(() => {
+    if (!user || !token) return
+
     loadDashboard()
+    const intervalId = window.setInterval(() => {
+      void loadDashboard()
+    }, 15000)
+
+    return () => window.clearInterval(intervalId)
   }, [user, token])
 
   const roleBasedCards = useMemo(() => {
@@ -52,9 +61,9 @@ const DashboardPage = () => {
     if (role === 'employer') {
       return [
         { label: 'Jobs posted', value: stats.totalJobsPosted || 0, icon: Briefcase },
-        { label: 'Active jobs', value: stats.activeJobs || 0, icon: Sparkles },
+        { label: 'Total earnings', value: `₹${stats.totalEarnings || stats.earnings || 0}`, icon: Wallet },
+        { label: 'Available balance', value: `₹${stats.earnings || stats.totalEarnings || 0}`, icon: Wallet },
         { label: 'Completed jobs', value: stats.completedJobs || 0, icon: CheckCircle2 },
-        { label: 'Total spent', value: `₹${stats.totalSpentAmount || 0}`, icon: Wallet },
       ]
     }
 
@@ -65,6 +74,9 @@ const DashboardPage = () => {
       { label: 'Workers', value: stats.totalWorkers || 0, icon: Sparkles },
     ]
   }, [stats, user?.role])
+
+  const employerApplications = useMemo(() => (bookings || []).filter((booking) => booking.employerId === user?.id || booking.userId === user?.id || booking.providerId === user?.id), [bookings, user?.id])
+  const unreadNotifications = (notifications || []).filter((notification) => !notification.isRead).length
 
   const handleBookingAction = async (bookingId, action) => {
     try {
@@ -89,6 +101,16 @@ const DashboardPage = () => {
           <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">{user.role} account</div>
         </div>
       </div>
+
+      {profileIncomplete ? (
+        <div className="mt-6 flex flex-col gap-3 rounded-[24px] border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Complete your profile</p>
+            <p className="mt-1 text-sm text-amber-700">A few more details will help you appear more trustworthy to employers and clients.</p>
+          </div>
+          <Link to="/profile" className="inline-flex items-center justify-center rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white">Complete Profile</Link>
+        </div>
+      ) : null}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {roleBasedCards.map((card) => {
@@ -135,6 +157,58 @@ const DashboardPage = () => {
                 )) : <p className="text-sm text-slate-500">No payout activity yet.</p>}
               </div>
             </div>
+          ) : null}
+
+          {user?.role === 'employer' ? (
+            <>
+              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Recent applications</p>
+                    <h2 className="mt-2 text-xl font-semibold text-slate-900">Latest applicant details and booking requests</h2>
+                  </div>
+                  <div className="rounded-full bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">{employerApplications.length} requests</div>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {employerApplications.length ? employerApplications.slice(0, 5).map((booking) => (
+                    <div key={booking.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{booking.serviceTitle}</p>
+                          <p className="mt-1 text-sm text-slate-500">Applicant: {booking.contactName || 'Pending review'}</p>
+                        </div>
+                        <div className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700">{booking.status || 'pending'}</div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
+                        <span>{booking.contactEmail || 'No email provided'}</span>
+                        <span>₹{booking.price || booking.amount || 0}</span>
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-slate-500">No applications have arrived yet.</p>}
+                </div>
+              </div>
+
+              <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Transaction history</p>
+                    <h2 className="mt-2 text-xl font-semibold text-slate-900">Recent earnings and completed payments</h2>
+                  </div>
+                  <div className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{earningsHistory.length} entries</div>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {earningsHistory.length ? earningsHistory.slice(0, 6).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">₹{item.amount}</p>
+                        <p className="text-xs text-slate-500">{item.date ? new Date(item.date).toLocaleDateString() : 'Recent payout'}</p>
+                      </div>
+                      <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{item.status}</div>
+                    </div>
+                  )) : <p className="text-sm text-slate-500">No completed transactions yet.</p>}
+                </div>
+              </div>
+            </>
           ) : null}
 
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -186,7 +260,10 @@ const DashboardPage = () => {
 
           <div className="space-y-6">
             <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-2 text-slate-900"><BellRing size={18} /> Notifications</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-slate-900"><BellRing size={18} /> Notifications</div>
+                <div className="rounded-full bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">{unreadNotifications} unread</div>
+              </div>
               <div className="mt-6 space-y-3">
                 {notifications.length ? notifications.slice(0, 5).map((notification) => (
                   <div key={notification.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">

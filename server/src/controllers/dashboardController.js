@@ -67,6 +67,8 @@ export const getDashboardStats = async (req, res, next) => {
       stats.activeJobs = jobs.filter((job) => job.status === 'approved').length
       stats.completedJobs = completedBookings.length
       stats.totalSpentAmount = spentAmount
+      stats.totalEarnings = Number(viewer?.earnings || 0)
+      stats.earnings = Number(viewer?.earnings || 0)
     }
 
     if (role === 'admin' || role === 'super_admin') {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Briefcase, MapPin, Sparkles } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Driver', 'Delivery Boy', 'Farmer', 'Labour', 'House Helper', 'Cleaner', 'Mechanic', 'AC Repair', 'Mobile Repair', 'Computer Repair', 'Tutor', 'Freelancer', 'Other']
 const workTypeOptions = ['Full Time', 'Part Time', 'Daily Wage', 'Contract', 'Temporary']
@@ -43,14 +44,18 @@ const matchesGoal = (job, selectedGoal) => {
 const JobsPage = () => {
   const { user, token } = useAuth()
   const { t } = useLanguage()
+  const navigate = useNavigate()
+  const canCreatePosts = ['employer', 'admin', 'super_admin'].includes(user?.role)
   const [jobs, setJobs] = useState([])
   const [selectedGoal, setSelectedGoal] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [formMessage, setFormMessage] = useState('')
   const { register, handleSubmit, reset } = useForm({ defaultValues: { workType: 'Full Time', category: '' } })
 
   const loadJobs = async () => {
     const { data } = await apiClient.get('/jobs')
     setJobs(data.jobs || [])
+    console.log(data,'job object')
   }
 
   useEffect(() => {
@@ -58,26 +63,36 @@ const JobsPage = () => {
   }, [])
 
   const onSubmit = async (values) => {
-    await apiClient.post('/jobs', {
-      ...values,
-      title: values.title?.trim(),
-      category: values.category?.trim(),
-      location: values.location?.trim(),
-      salary: values.salary?.trim() || values.price?.trim() || values.budget?.trim() || '',
-      price: Number(values.price || values.salary || values.budget || 0),
-      budget: values.budget?.trim() || values.price?.trim() || values.salary?.trim() || '',
-      jobDate: values.jobDate?.trim() || '',
-      duration: values.duration?.trim() || '',
-      description: values.description?.trim(),
-      experienceRequired: values.experienceRequired?.trim(),
-      contactNumber: values.contactNumber?.trim(),
-      workType: values.workType?.trim() || 'Full Time',
-      postedByRole: user?.role || 'employer',
-    }, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    reset({ workType: 'Full Time', category: '' })
-    await loadJobs()
+    if (!canCreatePosts) {
+      setFormMessage('Only employers and admins can publish jobs.')
+      return
+    }
+
+    try {
+      await apiClient.post('/jobs', {
+        ...values,
+        title: values.title?.trim(),
+        category: values.category?.trim() || values.title?.trim() || 'Other',
+        location: values.location?.trim(),
+        salary: values.salary?.trim() || values.price?.trim() || values.budget?.trim() || '',
+        price: Number(values.price || values.salary || values.budget || 0),
+        budget: values.budget?.trim() || values.price?.trim() || values.salary?.trim() || '',
+        jobDate: values.jobDate?.trim() || '',
+        duration: values.duration?.trim() || '',
+        description: values.description?.trim(),
+        experienceRequired: values.experienceRequired?.trim(),
+        contactNumber: values.contactNumber?.trim(),
+        workType: values.workType?.trim() || 'Full Time',
+        postedByRole: user?.role || 'employer',
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setFormMessage('Job posted successfully.')
+      reset({ workType: 'Full Time', category: '' })
+      await loadJobs()
+    } catch (error) {
+      setFormMessage(error?.response?.data?.message || 'We could not publish this job right now.')
+    }
   }
 
   const handleGoalSelect = (goalId) => {
@@ -93,11 +108,31 @@ const JobsPage = () => {
     return [job.title, job.category, job.location, job.description].join(' ').toLowerCase().includes(query)
   }
 
-  const applyToJob = async (jobId) => {
-    await apiClient.post(`/jobs/${jobId}/apply`, {}, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('rozwork_token')}` },
-    })
-    alert(t('jobs.applicationSubmitted'))
+  const applyToJob = async (job) => {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    try {
+      await apiClient.post('/bookings', {
+        employerId: job.postedBy,
+        workerId: user.id,
+        jobId: job.id,
+        serviceTitle: job.title,
+        serviceProvider: job.category || 'General',
+        price: job.price || job.salary || 0,
+        category: job.category || 'General',
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      await apiClient.post(`/jobs/${job.id}/apply`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      navigate('/profile', { state: { successMessage: 'Application submitted successfully.' } })
+    } catch (error) {
+      setFormMessage('We could not submit your application right now.')
+    }
   }
 
   const visibleJobs = jobs.filter((job) => matchesGoal(job, selectedGoal) && matchesSearch(job))
@@ -118,26 +153,34 @@ const JobsPage = () => {
         <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('jobs.postJob')}</h2>
+            {canCreatePosts ? null : <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600">View only access</span>}
           </div>
-          <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobTitle', 'Job Title')} {...register('title', { required: true })} />
-            <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('category', { required: true })}>
-              <option value="">{t('jobs.category', 'Select category')}</option>
-              {serviceCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-            </select>
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.location', 'Location')} {...register('location', { required: true })} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.price', 'Budget / Price')} {...register('price')} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.budget', 'Budget label')} {...register('budget')} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobDate', 'Preferred date')} type="date" {...register('jobDate')} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.duration', 'Duration')} {...register('duration')} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.experience', 'Experience required')} {...register('experienceRequired')} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.contact', 'Contact number')} {...register('contactNumber')} />
-            <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('workType')}>
-              {workTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-            <textarea className="md:col-span-2 rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.description', 'Description')} rows="4" {...register('description', { required: true })} />
-            <button className="md:col-span-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white">{t('jobs.publishJob', 'Publish job')}</button>
-          </form>
+          {canCreatePosts ? (
+            <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobTitle', 'Job Title')} {...register('title', { required: true })} />
+              <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('category', { required: true })}>
+                <option value="">{t('jobs.category', 'Select category')}</option>
+                {serviceCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.location', 'Location')} {...register('location', { required: true })} />
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.price', 'Budget / Price')} {...register('price')} />
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.budget', 'Budget label')} {...register('budget')} />
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobDate', 'Preferred date')} type="date" {...register('jobDate')} />
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.duration', 'Duration')} {...register('duration')} />
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.experience', 'Experience required')} {...register('experienceRequired')} />
+              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.contact', 'Contact number')} {...register('contactNumber')} />
+              <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('workType')}>
+                {workTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+              <textarea className="md:col-span-2 rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.description', 'Description')} rows="4" {...register('description', { required: true })} />
+              <button className="md:col-span-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white">{t('jobs.publishJob', 'Publish job')}</button>
+              {formMessage ? <p className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{formMessage}</p> : null}
+            </form>
+          ) : (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Only employers and admins can publish jobs. Regular users can browse listings and apply for opportunities.
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -209,7 +252,7 @@ const JobsPage = () => {
               {job.jobDate ? <span>{job.jobDate}</span> : null}
               {job.duration ? <span>{job.duration}</span> : null}
             </div>
-            <button onClick={() => applyToJob(job.id)} className="mt-6 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">{t('jobs.applyNow')}</button>
+            <button onClick={() => applyToJob(job)} className="mt-6 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">{t('jobs.applyNow')}</button>
           </div>
         ))}
       </div>

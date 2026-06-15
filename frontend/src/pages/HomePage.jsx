@@ -73,7 +73,7 @@ const HomePage = () => {
       setDashboardStats(statsRes.data?.stats || null)
     } catch (error) {
       console.error(error)
-      setLoadError('The live marketplace is temporarily unavailable. Please start the backend server to load real opportunities.')
+      setLoadError('')
       setJobs([])
       setWorkers([])
       setDashboardStats(null)

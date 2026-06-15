@@ -14,7 +14,7 @@ const bookingSchema = new mongoose.Schema(
     price: { type: Number, default: 0 },
     category: { type: String, default: 'General' },
     currency: { type: String, default: 'INR' },
-    status: { type: String, enum: ['pending', 'accepted', 'rejected', 'waiting_for_verification', 'verification_rejected', 'completed', 'cancelled'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'accepted', 'rejected', 'waiting_for_verification', 'verification_rejected', 'completed', 'confirmed', 'cancelled'], default: 'pending' },
     verified: { type: Boolean, default: false },
     verificationStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     completedAt: { type: Date, default: null },

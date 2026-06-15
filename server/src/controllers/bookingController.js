@@ -1,7 +1,10 @@
 import Booking from '../models/Booking.js'
 import Payment from '../models/Payment.js'
+import Job from '../models/Job.js'
+import Transaction from '../models/Transaction.js'
 import User from '../models/User.js'
 import { createNotification, notifyAdmins } from '../utils/notify.js'
+import { recordUserActivity } from '../utils/activity.js'
 
 const serializeBooking = (booking) => ({
   id: booking._id ? booking._id.toString() : booking.id,
@@ -47,25 +50,25 @@ export const listBookings = async (req, res, next) => {
 
 export const createBooking = async (req, res, next) => {
   try {
-    const employerId = req.body.employerId || req.body.userId || req.user.id
-    const workerId = req.body.workerId || req.body.providerId || null
+    const employerId = req.body.employerId || req.body.userId || req.body.providerId || (req.user.role === 'employer' ? req.user.id : null)
+    const workerId = req.body.workerId || req.body.providerId || (req.user.role === 'worker' ? req.user.id : null)
 
-    if (!workerId) {
-      return res.status(400).json({ message: 'A worker must be selected for the booking.' })
+    if (!employerId || !workerId) {
+      return res.status(400).json({ message: 'Both an employer and a worker must be selected for the booking.' })
     }
 
-    const amount = Number(req.body.price ?? req.body.amount ?? 0)
+    const amount = Number(req.body.price ?? req.body.amount ?? req.body.budget ?? 0)
     const booking = await Booking.create({
       employerId,
       workerId,
-      userId: employerId,
-      providerId: workerId,
+      userId: workerId,
+      providerId: employerId,
       jobId: req.body.jobId || req.body.serviceId || '',
       serviceId: req.body.serviceId || null,
       serviceTitle: req.body.serviceTitle || req.body.service || req.body.title || 'Service',
       serviceProvider: req.body.serviceProvider || '',
-      amount,
-      price: amount,
+      amount: Number.isFinite(amount) ? amount : 0,
+      price: Number.isFinite(amount) ? amount : 0,
       category: req.body.category || req.body.serviceCategory || 'General',
       note: req.body.note || '',
       contactName: req.body.contactName || req.user.name,
@@ -76,7 +79,7 @@ export const createBooking = async (req, res, next) => {
       paymentStatus: req.body.paymentStatus || 'pending',
     })
 
-    await Promise.all([
+    await Promise.allSettled([
       createNotification({
         userId: workerId,
         type: 'booking_received',
@@ -99,6 +102,18 @@ export const createBooking = async (req, res, next) => {
         message: `${req.user.name || 'A user'} booked ${booking.serviceTitle || 'a service'}.`,
         relatedId: booking._id,
         fromUserId: employerId,
+      }),
+      recordUserActivity({
+        userId: workerId,
+        username: req.user.username || req.user.email || 'member',
+        fullName: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+        action: 'booking_created',
+        entityType: 'booking',
+        entityId: booking._id.toString(),
+        entityTitle: booking.serviceTitle,
+        details: 'Submitted a new booking application',
       }),
     ])
 
@@ -250,21 +265,43 @@ export const verifyBooking = async (req, res, next) => {
     await booking.save()
 
     const worker = await User.findById(booking.workerId)
+    const employer = await User.findById(booking.employerId || booking.userId || booking.providerId)
     const amount = Number(booking.amount || booking.price || 0)
+
     if (worker) {
       worker.earnings = Number(worker.earnings || 0) + amount
       worker.completedJobs = Number(worker.completedJobs || 0) + 1
       await worker.save()
     }
 
+    if (employer) {
+      employer.earnings = Number(employer.earnings || 0) + amount
+      employer.completedJobs = Number(employer.completedJobs || 0) + 1
+      await employer.save()
+    }
+
+    await Job.findByIdAndUpdate(booking.jobId, { status: 'completed' }, { new: true }).catch(() => {})
+
     const payment = await Payment.create({
       workerId: booking.workerId,
-      employerId: booking.employerId,
+      employerId: booking.employerId || booking.userId || booking.providerId,
       bookingId: booking._id,
       amount,
       status: 'completed',
       date: new Date(),
     })
+
+    if (employer) {
+      await Transaction.create({
+        userId: employer._id,
+        type: 'payment',
+        amount,
+        currency: 'INR',
+        status: 'completed',
+        reference: payment._id.toString(),
+        description: `Payment received for ${booking.serviceTitle}`,
+      })
+    }
 
     await Promise.all([
       createNotification({

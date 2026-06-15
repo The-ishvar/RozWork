@@ -24,7 +24,11 @@ const ProtectedRoute = ({ children }) => {
 const PublicRoute = ({ children }) => {
   const { user, loading, token } = useAuth()
   if (loading) return <div className="px-4 py-16 text-center text-slate-500">Loading your workspace...</div>
-  return token || user ? <Navigate to="/dashboard" replace /> : children
+  if (token || user) {
+    const destination = user?.role === 'admin' || user?.role === 'super_admin' ? '/admin' : '/dashboard'
+    return <Navigate to={destination} replace />
+  }
+  return children
 }
 
 const AdminPublicRoute = ({ children }) => {

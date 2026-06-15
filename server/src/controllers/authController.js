@@ -2,9 +2,11 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import User from '../models/User.js'
 import Purchase from '../models/Purchase.js'
+import LoginHistory from '../models/LoginHistory.js'
 import { addAuditLog } from '../utils/audit.js'
 import { ensureDatabaseConnection } from '../db/connect.js'
 import { notifyAdmins } from '../utils/notify.js'
+import { recordUserActivity } from '../utils/activity.js'
 
 const otpStore = new Map()
 
@@ -13,6 +15,14 @@ const getJwtSecret = () => process.env.JWT_SECRET || process.env.JWT_SECRET_KEY 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase()
 const normalizePhone = (value) => String(value || '').trim()
 const normalizeUsername = (value) => String(value || '').trim()
+
+const getClientMeta = (req) => {
+  const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0]?.trim()
+  return {
+    ipAddress: forwardedFor || req.ip || req.socket?.remoteAddress || 'unknown',
+    device: String(req.get('user-agent') || '').slice(0, 180) || 'unknown',
+  }
+}
 
 const buildEmailFromIdentity = (name, phone, username) => {
   const fallbackBase = normalizeUsername(username) || normalizePhone(phone) || String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '')
@@ -83,6 +93,7 @@ const serializeUser = (user, purchases = []) => ({
   isBanned: !!user.isBanned,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
+  lastActiveAt: user.lastActiveAt,
   purchases,
 })
 
@@ -130,7 +141,17 @@ export const register = async (req, res, next) => {
 
     const user = await User.create(userPayload)
 
-    addAuditLog({ type: 'auth', action: 'register', userId: user._id.toString(), message: `${user.name} registered` })
+    const clientMeta = getClientMeta(req)
+    addAuditLog({
+      type: 'auth',
+      action: 'register',
+      userId: user._id.toString(),
+      username: user.username || user.email,
+      role: user.role,
+      message: `${user.name} registered`,
+      ipAddress: clientMeta.ipAddress,
+      device: clientMeta.device,
+    })
     await notifyAdmins({
       type: 'registration',
       title: 'New registration',
@@ -210,14 +231,52 @@ export const login = async (req, res, next) => {
       await user.save()
     }
 
-    addAuditLog({ type: 'auth', action: 'login', userId: user._id.toString(), message: `${user.name} logged in` })
-    await notifyAdmins({
-      type: 'login',
-      title: 'Member login',
-      message: `${user.name} signed in to RozWork.`,
-      relatedId: user._id,
-      fromUserId: user._id,
-    })
+    const clientMeta = getClientMeta(req)
+    user.lastActiveAt = new Date()
+    await user.save({ validateBeforeSave: false })
+
+    await Promise.allSettled([
+      LoginHistory.create({
+        userId: user._id,
+        username: user.username || user.email,
+        fullName: user.name,
+        email: user.email,
+        role: user.role,
+        loginAt: new Date(),
+        lastActiveAt: new Date(),
+        ipAddress: clientMeta.ipAddress,
+        deviceInfo: clientMeta.device,
+      }),
+      recordUserActivity({
+        userId: user._id,
+        username: user.username || user.email,
+        fullName: user.name,
+        email: user.email,
+        role: user.role,
+        action: 'login',
+        entityType: 'auth',
+        details: 'Successful login',
+        ipAddress: clientMeta.ipAddress,
+        deviceInfo: clientMeta.device,
+      }),
+      addAuditLog({
+        type: 'auth',
+        action: 'login',
+        userId: user._id.toString(),
+        username: user.username || user.email,
+        role: user.role,
+        message: `${user.name} logged in`,
+        ipAddress: clientMeta.ipAddress,
+        device: clientMeta.device,
+      }),
+      notifyAdmins({
+        type: 'login',
+        title: 'Member login',
+        message: `${user.name} signed in to RozWork.`,
+        relatedId: user._id,
+        fromUserId: user._id,
+      }),
+    ])
 
     const token = createToken(user)
     const purchases = await Purchase.find({ userId: user._id }).lean()

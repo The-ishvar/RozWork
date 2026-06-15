@@ -77,6 +77,9 @@ const AdminPanelPage = () => {
   const [editingUserId, setEditingUserId] = useState(null)
   const [editingUser, setEditingUser] = useState({ name: '', email: '', phone: '', profession: '', location: '', role: 'worker' })
 
+  const recentLogins = useMemo(() => auditLogs.filter((entry) => entry.action === 'login').slice(0, 6), [auditLogs])
+  const activeUserList = useMemo(() => users.filter((entry) => !entry.isSuspended && !entry.isBanned).slice(0, 6), [users])
+
   const loadDashboard = async () => {
     if (!token) return
 
@@ -300,7 +303,7 @@ const AdminPanelPage = () => {
   )
 
   if (!user) return <Navigate to="/login" replace />
-  if (user.role !== 'super_admin') return <Navigate to="/profile" replace />
+  if (!['admin', 'super_admin'].includes(user.role)) return <Navigate to="/dashboard" replace />
 
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 text-slate-900 dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
@@ -308,7 +311,7 @@ const AdminPanelPage = () => {
         <aside className="w-full rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm lg:w-72">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">Super admin</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">Admin control</p>
               <h1 className="text-xl font-semibold">{user.name}</h1>
             </div>
             <div className="rounded-full bg-blue-50 p-2 text-blue-600">
@@ -399,6 +402,49 @@ const AdminPanelPage = () => {
                         </div>
                       </div>
                     )) : <p className="text-sm text-slate-500">Growth data will appear once more users register.</p>}
+                  </div>
+                </section>
+              </div>
+              <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">Active users</h3>
+                      <p className="text-sm text-slate-500">Accounts that are currently eligible to use the platform.</p>
+                    </div>
+                    <div className="rounded-full bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{stats.activeUsers}</div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {activeUserList.length ? activeUserList.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div>
+                          <p className="font-medium text-slate-900">{entry.name}</p>
+                          <p className="text-sm text-slate-500">{entry.role} • {entry.email}</p>
+                        </div>
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Online</span>
+                      </div>
+                    )) : <p className="text-sm text-slate-500">No active users right now.</p>}
+                  </div>
+                </section>
+                <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">Recent logins</h3>
+                      <p className="text-sm text-slate-500">Recent sign-ins and authentications from the team and members.</p>
+                    </div>
+                    <div className="rounded-full bg-blue-50 px-3 py-2 text-sm text-blue-700">{recentLogins.length}</div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {recentLogins.length ? recentLogins.map((entry) => (
+                      <div key={entry.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-slate-900">{entry.username || entry.userName || entry.message || 'Login'}</p>
+                          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">{entry.role || 'member'}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">{entry.message || 'Successful login'}</p>
+                        <p className="mt-2 text-xs text-slate-400">{new Date(entry.createdAt).toLocaleString()}</p>
+                      </div>
+                    )) : <p className="text-sm text-slate-500">No recent logins yet.</p>}
                   </div>
                 </section>
               </div>

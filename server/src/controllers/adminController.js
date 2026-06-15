@@ -5,7 +5,25 @@ import Purchase from '../models/Purchase.js'
 import Notification from '../models/Notification.js'
 import Service from '../models/Service.js'
 import Transaction from '../models/Transaction.js'
+import LoginHistory from '../models/LoginHistory.js'
+import UserActivity from '../models/UserActivity.js'
 import { getAuditLogs } from '../utils/audit.js'
+
+const serializeJobForAdmin = (job) => ({
+  id: job._id ? job._id.toString() : job.id,
+  title: job.title,
+  category: job.category,
+  location: job.location,
+  salary: job.salary,
+  price: Number(job.price ?? job.salary ?? 0),
+  budget: job.budget || job.salary || '',
+  description: job.description,
+  status: job.status,
+  postedBy: job.postedBy ? job.postedBy.toString() : '',
+  postedByRole: job.postedByRole || 'employer',
+  createdAt: job.createdAt,
+  updatedAt: job.updatedAt,
+})
 
 const serializeUser = (user) => ({
   id: user._id ? user._id.toString() : user.id,
@@ -17,6 +35,7 @@ const serializeUser = (user) => ({
   isVerified: user.isVerified !== false,
   isSuspended: !!user.isSuspended,
   isBanned: !!user.isBanned,
+  lastActiveAt: user.lastActiveAt,
   createdAt: user.createdAt,
 })
 
@@ -26,6 +45,73 @@ export const getUsers = async (_req, res, next) => {
     return res.json({ users: users.map(serializeUser) })
   } catch (error) {
     console.error('admin.getUsers failed', error)
+    next(error)
+  }
+}
+
+export const getLoginHistory = async (req, res, next) => {
+  try {
+    const query = String(req.query.q || '').trim().toLowerCase()
+    const role = String(req.query.role || '').trim()
+    const date = String(req.query.date || '').trim()
+
+    const logins = await LoginHistory.find().sort({ loginAt: -1 }).lean()
+    const filtered = logins.filter((entry) => {
+      const haystack = [entry.fullName, entry.email, entry.username, entry.role].join(' ').toLowerCase()
+      const matchesQuery = !query || haystack.includes(query)
+      const matchesRole = !role || entry.role === role
+      const matchesDate = !date || entry.loginAt?.toISOString().slice(0, 10) === date
+      return matchesQuery && matchesRole && matchesDate
+    })
+
+    return res.json({ logins: filtered.map((entry) => ({
+      id: entry._id.toString(),
+      userId: entry.userId?.toString(),
+      username: entry.username,
+      fullName: entry.fullName,
+      email: entry.email,
+      role: entry.role,
+      loginAt: entry.loginAt,
+      lastActiveAt: entry.lastActiveAt,
+      ipAddress: entry.ipAddress,
+      deviceInfo: entry.deviceInfo,
+    })) })
+  } catch (error) {
+    console.error('admin.getLoginHistory failed', error)
+    next(error)
+  }
+}
+
+export const getUserActivities = async (req, res, next) => {
+  try {
+    const query = String(req.query.q || '').trim().toLowerCase()
+    const role = String(req.query.role || '').trim()
+    const date = String(req.query.date || '').trim()
+
+    const activities = await UserActivity.find().sort({ createdAt: -1 }).lean()
+    const filtered = activities.filter((entry) => {
+      const haystack = [entry.fullName, entry.email, entry.username, entry.action, entry.entityTitle, entry.details].join(' ').toLowerCase()
+      const matchesQuery = !query || haystack.includes(query)
+      const matchesRole = !role || entry.role === role
+      const matchesDate = !date || entry.createdAt?.toISOString().slice(0, 10) === date
+      return matchesQuery && matchesRole && matchesDate
+    })
+
+    return res.json({ activities: filtered.map((entry) => ({
+      id: entry._id.toString(),
+      userId: entry.userId?.toString(),
+      username: entry.username,
+      fullName: entry.fullName,
+      email: entry.email,
+      role: entry.role,
+      action: entry.action,
+      entityType: entry.entityType,
+      entityTitle: entry.entityTitle,
+      details: entry.details,
+      createdAt: entry.createdAt,
+    })) })
+  } catch (error) {
+    console.error('admin.getUserActivities failed', error)
     next(error)
   }
 }
@@ -146,13 +232,39 @@ export const deleteUser = async (req, res, next) => {
   }
 }
 
+export const updateJob = async (req, res, next) => {
+  try {
+    const { status, ...updates } = req.body
+    const payload = { ...updates }
+    if (status) payload.status = status
+
+    const job = await Job.findByIdAndUpdate(req.params.jobId, payload, { new: true, runValidators: true })
+    if (!job) return res.status(404).json({ message: 'Job not found' })
+    return res.json({ job: serializeJobForAdmin(job) })
+  } catch (error) {
+    console.error('admin.updateJob failed', error)
+    next(error)
+  }
+}
+
 export const updateJobStatus = async (req, res, next) => {
   try {
     const job = await Job.findByIdAndUpdate(req.params.jobId, { status: req.body.status }, { new: true, runValidators: true })
     if (!job) return res.status(404).json({ message: 'Job not found' })
-    return res.json({ job })
+    return res.json({ job: serializeJobForAdmin(job) })
   } catch (error) {
     console.error('admin.updateJobStatus failed', error)
+    next(error)
+  }
+}
+
+export const deleteJob = async (req, res, next) => {
+  try {
+    const deleted = await Job.findByIdAndDelete(req.params.jobId)
+    if (!deleted) return res.status(404).json({ message: 'Job not found' })
+    return res.json({ success: true })
+  } catch (error) {
+    console.error('admin.deleteJob failed', error)
     next(error)
   }
 }
@@ -299,7 +411,9 @@ export default {
   getOverview,
   updateUserStatus,
   deleteUser,
+  updateJob,
   updateJobStatus,
+  deleteJob,
   getContent,
   createContent,
   updateContent,

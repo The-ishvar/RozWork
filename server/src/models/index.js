@@ -6,6 +6,8 @@ import Notification from './Notification.js'
 import Service from './Service.js'
 import Job from './Job.js'
 import Transaction from './Transaction.js'
+import LoginHistory from './LoginHistory.js'
+import UserActivity from './UserActivity.js'
 
-export { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction }
-export default { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction }
+export { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity }
+export default { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity }

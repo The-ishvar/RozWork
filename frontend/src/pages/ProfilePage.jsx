@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Briefcase, Camera, Edit3, Mail, MapPin, Phone, ShieldCheck, Sparkles, Wallet, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
@@ -20,9 +21,12 @@ const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter'
 
 const ProfilePage = () => {
   const { user, updateProfile, token } = useAuth()
+  const location = useLocation()
   const [profile, setProfile] = useState(initialProfileState)
   const [stats, setStats] = useState({ totalJobsPosted: 0, totalBookings: 0 })
   const [purchases, setPurchases] = useState([])
+  const [myPosts, setMyPosts] = useState([])
+  const [bookings, setBookings] = useState([])
   const [serviceCategories, setServiceCategories] = useState([])
   const [skills, setSkills] = useState(['React', 'Tailwind CSS', 'Node.js'])
   const [experience, setExperience] = useState([{ company: '', position: '', startDate: '', endDate: '', description: '' }])
@@ -35,6 +39,9 @@ const ProfilePage = () => {
   const [resumeDraft, setResumeDraft] = useState('')
   const [message, setMessage] = useState('')
   const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [isPostEditorOpen, setIsPostEditorOpen] = useState(false)
+  const [editingPost, setEditingPost] = useState(null)
+  const [editingPostForm, setEditingPostForm] = useState({ title: '', category: '', location: '', salary: '', budget: '', description: '', workType: 'Full Time' })
   const [focusMode, setFocusMode] = useState(false)
   const [activeSection, setActiveSection] = useState('')
   const [loading, setLoading] = useState(false)
@@ -42,16 +49,27 @@ const ProfilePage = () => {
   const loadDashboardData = async () => {
     if (!user || !token) return
     try {
-      const [purchasesResponse, statsResponse] = await Promise.all([
+      const [purchasesResult, statsResult, jobsResult, bookingsResult] = await Promise.allSettled([
         apiClient.get('/purchases', { headers: { Authorization: `Bearer ${token}` } }),
         apiClient.get('/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } }),
+        apiClient.get('/jobs/mine', { headers: { Authorization: `Bearer ${token}` } }),
+        apiClient.get('/bookings', { headers: { Authorization: `Bearer ${token}` } }),
       ])
-      setPurchases(purchasesResponse.data.purchases || [])
-      setStats(statsResponse.data?.stats || { totalJobsPosted: 0, totalBookings: 0 })
+
+      setPurchases(purchasesResult.status === 'fulfilled' ? purchasesResult.value.data.purchases || [] : [])
+      setStats(statsResult.status === 'fulfilled' ? statsResult.value.data?.stats || { totalJobsPosted: 0, totalBookings: 0 } : { totalJobsPosted: 0, totalBookings: 0 })
+      setMyPosts(jobsResult.status === 'fulfilled' ? jobsResult.value.data.jobs || [] : [])
+      setBookings(bookingsResult.status === 'fulfilled' ? bookingsResult.value.data.bookings || [] : [])
     } catch (error) {
       console.error(error)
     }
   }
+
+  useEffect(() => {
+    if (location.state?.successMessage) {
+      setMessage(location.state.successMessage)
+    }
+  }, [location.state])
 
   useEffect(() => {
     if (!user) return
@@ -121,6 +139,52 @@ const ProfilePage = () => {
       setMessage('The profile could not be saved right now.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const openPostEditor = (post) => {
+    setEditingPost(post)
+    setEditingPostForm({
+      title: post.title || '',
+      category: post.category || '',
+      location: post.location || '',
+      salary: post.salary || post.price || '',
+      budget: post.budget || post.salary || '',
+      description: post.description || '',
+      workType: post.workType || 'Full Time',
+    })
+    setIsPostEditorOpen(true)
+  }
+
+  const handleDeletePost = async (postId) => {
+    if (!token) return
+    try {
+      await apiClient.delete(`/jobs/${postId}`, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Post deleted successfully.')
+      await loadDashboardData()
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to delete this post right now.')
+    }
+  }
+
+  const handleSavePost = async () => {
+    if (!token || !editingPost) return
+    try {
+      await apiClient.put(`/jobs/${editingPost.id}`, {
+        title: editingPostForm.title.trim(),
+        category: editingPostForm.category.trim(),
+        location: editingPostForm.location.trim(),
+        salary: editingPostForm.salary.trim(),
+        budget: editingPostForm.budget.trim() || editingPostForm.salary.trim(),
+        description: editingPostForm.description.trim(),
+        workType: editingPostForm.workType.trim(),
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Post updated successfully.')
+      setIsPostEditorOpen(false)
+      setEditingPost(null)
+      await loadDashboardData()
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to update this post right now.')
     }
   }
 
@@ -201,6 +265,97 @@ const ProfilePage = () => {
           </div>
         </div>
       </div>
+
+      <div className="mx-auto mt-6 flex max-w-6xl flex-col gap-6">
+        <section className={`rounded-[32px] border border-slate-200 p-6 shadow-sm ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">My posts</p>
+              <h2 className="mt-2 text-xl font-semibold">Manage your posted jobs</h2>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">{myPosts.length} active</span>
+          </div>
+          <div className="mt-6 space-y-3">
+            {myPosts.length ? myPosts.map((post) => (
+              <div key={post.id} className={`rounded-2xl border border-slate-200 p-4 ${focusMode ? 'bg-white/10' : 'bg-slate-50'}`}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-900">{post.title}</p>
+                    <p className="mt-1 text-sm text-slate-500">{post.category} • {post.location}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => openPostEditor(post)} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Edit</button>
+                    <button type="button" onClick={() => handleDeletePost(post.id)} className="rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700">Delete</button>
+                  </div>
+                </div>
+              </div>
+            )) : <p className="text-sm text-slate-500">You have not posted any jobs yet.</p>}
+          </div>
+        </section>
+
+        <section className={`rounded-[32px] border border-slate-200 p-6 shadow-sm ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">My bookings</p>
+              <h2 className="mt-2 text-xl font-semibold">Track every application and booking</h2>
+            </div>
+            <span className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{bookings.length} total</span>
+          </div>
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-3 text-left font-semibold text-slate-700">Job title</th>
+                  <th className="px-3 py-3 text-left font-semibold text-slate-700">Employer</th>
+                  <th className="px-3 py-3 text-left font-semibold text-slate-700">Booked</th>
+                  <th className="px-3 py-3 text-left font-semibold text-slate-700">Price</th>
+                  <th className="px-3 py-3 text-left font-semibold text-slate-700">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {bookings.length ? bookings.map((booking) => (
+                  <tr key={booking.id}>
+                    <td className="px-3 py-3 font-medium text-slate-900">{booking.serviceTitle || booking.jobTitle || 'Booking'}</td>
+                    <td className="px-3 py-3 text-slate-600">{booking.serviceProvider || booking.employerName || 'Employer'}</td>
+                    <td className="px-3 py-3 text-slate-600">{new Date(booking.createdAt).toLocaleDateString()}</td>
+                    <td className="px-3 py-3 text-slate-600">₹{booking.price || booking.amount || 0}</td>
+                    <td className="px-3 py-3">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : booking.status === 'accepted' ? 'bg-blue-100 text-blue-700' : booking.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{booking.status || 'Pending'}</span>
+                    </td>
+                  </tr>
+                )) : <tr><td className="px-3 py-3 text-sm text-slate-500" colSpan="5">No bookings yet. Apply to a job and it will show up here.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      {isPostEditorOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className={`w-full max-w-2xl rounded-[28px] border border-slate-200 p-6 shadow-2xl ${focusMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-600">Edit post</p>
+                <h3 className="mt-1 text-xl font-semibold">Update your job listing</h3>
+              </div>
+              <button type="button" onClick={() => { setIsPostEditorOpen(false); setEditingPost(null) }} className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium">Close</button>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <input value={editingPostForm.title} onChange={(event) => setEditingPostForm({ ...editingPostForm, title: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Title" />
+              <input value={editingPostForm.category} onChange={(event) => setEditingPostForm({ ...editingPostForm, category: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Category" />
+              <input value={editingPostForm.location} onChange={(event) => setEditingPostForm({ ...editingPostForm, location: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Location" />
+              <input value={editingPostForm.salary} onChange={(event) => setEditingPostForm({ ...editingPostForm, salary: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Salary" />
+              <input value={editingPostForm.budget} onChange={(event) => setEditingPostForm({ ...editingPostForm, budget: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Budget" />
+              <input value={editingPostForm.workType} onChange={(event) => setEditingPostForm({ ...editingPostForm, workType: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2" placeholder="Work type" />
+              <textarea value={editingPostForm.description} onChange={(event) => setEditingPostForm({ ...editingPostForm, description: event.target.value })} className="md:col-span-2 rounded-2xl border border-slate-200 px-3 py-2" rows="4" placeholder="Description" />
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => { setIsPostEditorOpen(false); setEditingPost(null) }} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium">Cancel</button>
+              <button type="button" onClick={handleSavePost} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Save changes</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <AnimatePresence>
         {isEditorOpen ? (
