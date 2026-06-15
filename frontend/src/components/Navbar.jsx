@@ -18,7 +18,6 @@ const Navbar = () => {
     { to: '/jobs', label: t('nav.jobs'), icon: Briefcase },
     { to: '/workers', label: t('nav.workers'), icon: Users },
     { to: '/gallery', label: 'Gallery', icon: ImageIcon },
-    { to: user ? '/dashboard' : '/login', label: user ? 'Notifications' : t('common.login'), icon: user ? Bell : UserRound },
     { to: user ? '/profile' : '/login', label: user ? 'Profile' : t('common.login'), icon: user ? UserRound : UserRound },
   ]
 

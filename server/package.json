@@ -9,6 +9,7 @@
     "prestart": "npm install",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "seed": "node src/script/seedDemoData.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand"
   },
   "dependencies": {

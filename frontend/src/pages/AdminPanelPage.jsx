@@ -216,6 +216,16 @@ const AdminPanelPage = () => {
     }
   }
 
+  const handleDeleteJob = async (jobId) => {
+    try {
+      await apiClient.delete(`/jobs/${jobId}`, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Job deleted successfully.')
+      await loadDashboard()
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to delete the job.')
+    }
+  }
+
   const handleSettingsSave = async (event) => {
     event.preventDefault()
     try {
@@ -615,6 +625,7 @@ const AdminPanelPage = () => {
                       <div className="flex gap-2">
                         <button onClick={() => handleModeration('job', job.id, 'approve')} className="rounded-full bg-emerald-600 px-3 py-2 text-sm font-medium text-white">Approve</button>
                         <button onClick={() => handleModeration('job', job.id, 'reject')} className="rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700">Reject</button>
+                        <button onClick={() => handleDeleteJob(job.id)} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Delete</button>
                       </div>
                     </div>
                   ))}
