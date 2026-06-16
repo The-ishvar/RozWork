@@ -4,6 +4,7 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 import SplashScreen from '../screens/SplashScreen'
 import OnboardingScreen from '../screens/OnboardingScreen'
@@ -28,12 +29,25 @@ const Tab = createBottomTabNavigator()
 function MainTabs() {
    const { user } = useAuth()
    const { theme } = useTheme()
+   const { t } = useLanguage()
    const isAdmin = ['admin', 'super_admin'].includes(user?.role)
+
+   const tabLabels = {
+      Home: t('nav.home', 'Home'),
+      Search: t('nav.search', 'Search'),
+      Jobs: t('nav.jobs', 'Jobs'),
+      Bookings: t('nav.bookings', 'Bookings'),
+      Notifications: t('nav.notifications', 'Notifications'),
+      Messages: t('nav.messages', 'Messages'),
+      Profile: t('nav.profile', 'Profile'),
+      Admin: t('nav.admin', 'Admin'),
+   }
 
    return (
       <Tab.Navigator
          screenOptions={({ route }) => ({
             headerShown: false,
+            tabBarLabel: tabLabels[route.name] || route.name,
             tabBarIcon: ({ color, size }) => {
                const iconName = {
                   Home: 'home-outline',

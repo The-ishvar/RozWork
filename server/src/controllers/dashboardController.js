@@ -24,6 +24,7 @@ export const getDashboardStats = async (req, res, next) => {
 
     const completedBookings = bookings.filter((booking) => booking.status === 'completed')
     const pendingBookings = bookings.filter((booking) => booking.status === 'pending' || booking.status === 'accepted' || booking.status === 'waiting_for_verification')
+    const completedPayments = payments.filter((payment) => payment.status === 'completed')
     const activeJobs = jobs.filter((job) => job.status === 'approved').length
     const pendingJobs = jobs.filter((job) => job.status === 'pending').length
     const completedJobs = jobs.filter((job) => job.status === 'completed').length
@@ -46,13 +47,24 @@ export const getDashboardStats = async (req, res, next) => {
       totalEarnings,
       totalCompletedJobs: completedBookings.length,
       activeBookings: bookings.filter((booking) => booking.status === 'accepted' || booking.status === 'waiting_for_verification').length,
-      platformEarnings: completedBookings.reduce((sum, booking) => sum + Number(booking.amount || booking.price || 0), 0),
+      platformEarnings: completedPayments.reduce((sum, payment) => {
+        if (payment.paymentType === 'service_payment') {
+          return sum + Number(payment.commissionAmount || 0)
+        }
+        return sum + Number(payment.amount || 0)
+      }, 0),
       totalUsers: 0,
       totalWorkers: 0,
       totalEmployers: 0,
-      totalRevenue: completedBookings.reduce((sum, booking) => sum + Number(booking.amount || booking.price || 0), 0),
+      totalRevenue: completedPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
       earnings: viewer?.earnings || 0,
       completedWorkerJobs: viewer?.completedJobs || 0,
+      isPremium: !!viewer?.isPremium,
+      premiumPlan: viewer?.premiumPlan || '',
+      premiumExpiryDate: viewer?.premiumExpiryDate || null,
+      applicationFeeRevenue: completedPayments.filter((payment) => payment.paymentType === 'application_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+      bookingFeeRevenue: completedPayments.filter((payment) => payment.paymentType === 'booking_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+      premiumRevenue: completedPayments.filter((payment) => payment.paymentType === 'premium_membership').reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
     }
 
     if (role === 'worker') {
@@ -81,8 +93,16 @@ export const getDashboardStats = async (req, res, next) => {
       stats.totalWorkers = allUsers.filter((user) => user.role === 'worker').length
       stats.totalEmployers = allUsers.filter((user) => user.role === 'employer').length
       stats.totalBookings = allBookings.length
-      stats.totalRevenue = allBookings.filter((booking) => booking.status === 'completed').reduce((sum, booking) => sum + Number(booking.amount || booking.price || 0), 0)
-      stats.platformEarnings = stats.totalRevenue
+      stats.totalRevenue = completedPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+      stats.platformEarnings = completedPayments.reduce((sum, payment) => {
+        if (payment.paymentType === 'service_payment') {
+          return sum + Number(payment.commissionAmount || 0)
+        }
+        return sum + Number(payment.amount || 0)
+      }, 0)
+      stats.applicationFeeRevenue = completedPayments.filter((payment) => payment.paymentType === 'application_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+      stats.bookingFeeRevenue = completedPayments.filter((payment) => payment.paymentType === 'booking_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+      stats.premiumRevenue = completedPayments.filter((payment) => payment.paymentType === 'premium_membership').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
       stats.totalCompletedJobs = allBookings.filter((booking) => booking.status === 'completed').length
     }
 

@@ -47,6 +47,8 @@ const DashboardPage = () => {
     return () => window.clearInterval(intervalId)
   }, [user, token])
 
+  const premiumStatus = user?.isPremium || stats.isPremium ? 'Premium active' : 'Upgrade to premium'
+
   const roleBasedCards = useMemo(() => {
     const role = user?.role || 'user'
     if (role === 'worker') {
@@ -98,7 +100,10 @@ const DashboardPage = () => {
             <h1 className="mt-2 text-3xl font-semibold text-slate-900">{t('dashboard.welcomeBack')} {user.name}</h1>
             <p className="mt-3 max-w-2xl text-sm text-slate-500">A professional marketplace workspace for booking management, work verification, and earnings tracking.</p>
           </div>
-          <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">{user.role} account</div>
+          <div className="flex flex-wrap gap-2">
+            <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">{user.role} account</div>
+            <div className={`rounded-full px-4 py-2 text-sm font-semibold ${user?.isPremium || stats.isPremium ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{premiumStatus}</div>
+          </div>
         </div>
       </div>
 

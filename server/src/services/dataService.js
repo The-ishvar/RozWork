@@ -422,6 +422,9 @@ const getSettings = async () => {
     siteName: 'RozWork',
     heroTitle: 'Find real work, hire trusted people, and grow locally.',
     contactEmail: 'hello@rozwork.com',
+    platformCommission: 5,
+    premiumPrice: 99,
+    applicationFee: 20,
   }
 }
 

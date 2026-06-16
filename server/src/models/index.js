@@ -8,6 +8,7 @@ import Job from './Job.js'
 import Transaction from './Transaction.js'
 import LoginHistory from './LoginHistory.js'
 import UserActivity from './UserActivity.js'
+import Setting from './Setting.js'
 
-export { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity }
-export default { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity }
+export { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity, Setting }
+export default { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity, Setting }

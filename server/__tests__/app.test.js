@@ -247,6 +247,60 @@ describe('RozWork API', () => {
     expect(verifyResponse.body.payment).toBeTruthy()
   })
 
+  it('charges an application fee and records the payment when a worker applies', async () => {
+    const employerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Nadia',
+      email: 'nadia@example.com',
+      password: 'secret123',
+      role: 'employer',
+    })
+
+    const workerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Rohan',
+      email: 'rohan@example.com',
+      password: 'secret123',
+      role: 'worker',
+    })
+
+    const jobResponse = await request(app)
+      .post('/api/jobs')
+      .set('Authorization', `Bearer ${employerResponse.body.token}`)
+      .send({
+        title: 'Home AC servicing',
+        category: 'AC Repair',
+        location: 'Bengaluru',
+        salary: '₹1200/day',
+        description: 'Urgent AC cleaning and preventive servicing for a 3-bedroom home.',
+      })
+
+    const applyResponse = await request(app)
+      .post(`/api/jobs/${jobResponse.body.job.id}/apply`)
+      .set('Authorization', `Bearer ${workerResponse.body.token}`)
+
+    expect(applyResponse.status).toBe(201)
+    expect(applyResponse.body.payment).toBeTruthy()
+    expect(applyResponse.body.payment.amount).toBe(20)
+    expect(applyResponse.body.payment.paymentType).toBe('application_fee')
+  })
+
+  it('activates premium membership and waives the application fee for premium users', async () => {
+    const workerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Mina',
+      email: 'mina@example.com',
+      password: 'secret123',
+      role: 'worker',
+    })
+
+    const premiumResponse = await request(app)
+      .post('/api/purchases/premium')
+      .set('Authorization', `Bearer ${workerResponse.body.token}`)
+
+    expect(premiumResponse.status).toBe(201)
+    expect(premiumResponse.body.user.isPremium).toBe(true)
+    expect(premiumResponse.body.user.premiumPlan).toBe('monthly')
+    expect(premiumResponse.body.payment.paymentType).toBe('premium_membership')
+  })
+
   it('returns gallery items through the public API', async () => {
     const response = await request(app).get('/api/gallery')
 

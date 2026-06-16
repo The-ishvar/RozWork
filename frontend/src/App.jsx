@@ -13,17 +13,19 @@ import AdminPanelPage from './pages/AdminPanelPage'
 import GalleryPage from './pages/GalleryPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
-import { LanguageProvider } from './context/LanguageContext'
+import { LanguageProvider, useLanguage } from './context/LanguageContext'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
-  if (loading) return <div className="px-4 py-16 text-center text-slate-500">Loading your workspace...</div>
+  const { t } = useLanguage()
+  if (loading) return <div className="px-4 py-16 text-center text-slate-500">{t('common.loadingWorkspace', 'Loading your workspace...')}</div>
   return user ? children : <Navigate to="/login" replace />
 }
 
 const PublicRoute = ({ children }) => {
   const { user, loading, token } = useAuth()
-  if (loading) return <div className="px-4 py-16 text-center text-slate-500">Loading your workspace...</div>
+  const { t } = useLanguage()
+  if (loading) return <div className="px-4 py-16 text-center text-slate-500">{t('common.loadingWorkspace', 'Loading your workspace...')}</div>
   if (token || user) {
     const destination = user?.role === 'admin' || user?.role === 'super_admin' ? '/admin' : '/dashboard'
     return <Navigate to={destination} replace />
@@ -33,15 +35,17 @@ const PublicRoute = ({ children }) => {
 
 const AdminPublicRoute = ({ children }) => {
   const { user, loading } = useAuth()
+  const { t } = useLanguage()
 
-  if (loading) return <div className="px-4 py-16 text-center text-slate-500">Loading your workspace...</div>
+  if (loading) return <div className="px-4 py-16 text-center text-slate-500">{t('common.loadingWorkspace', 'Loading your workspace...')}</div>
   return user?.role === 'admin' || user?.role === 'super_admin' ? <Navigate to="/admin" replace /> : children
 }
 
 const AdminRoute = ({ children }) => {
   const { user, loading } = useAuth()
+  const { t } = useLanguage()
 
-  if (loading) return <div className="px-4 py-16 text-center text-slate-500">Loading your workspace...</div>
+  if (loading) return <div className="px-4 py-16 text-center text-slate-500">{t('common.loadingWorkspace', 'Loading your workspace...')}</div>
   return user?.role === 'admin' || user?.role === 'super_admin' ? children : <Navigate to="/dashboard" replace />
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Briefcase, Search, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import apiClient from '../api/client'
@@ -37,9 +38,9 @@ const HomePage = () => {
   const [dashboardStats, setDashboardStats] = useState(null)
 
   const ui = {
-    heroBadge: t('home.heroBadge'),
+    // heroBadge: t('home.heroBadge'),
     heroTitle: t('home.heroTitle'),
-    heroText: t('home.heroText'),
+    // heroText: t('home.heroText'),
     joinRozWork: t('home.joinRozWork'),
     findWork: t('home.findWork'),
     hireWorkers: t('home.hireWorkers'),
@@ -63,17 +64,20 @@ const HomePage = () => {
   const load = async () => {
     try {
       setLoadError('')
-      const [jobsRes, workersRes, statsRes] = await Promise.all([
+      const [jobsRes, workersRes] = await Promise.all([
         apiClient.get('/jobs'),
         apiClient.get('/workers'),
-        apiClient.get('/admin/stats'),
       ])
       setJobs(jobsRes.data.jobs || [])
       setWorkers(workersRes.data.workers || [])
-      setDashboardStats(statsRes.data?.stats || null)
+      setDashboardStats({
+        workers: workersRes.data.workers?.length || 0,
+        totalJobs: jobsRes.data.jobs?.length || 0,
+        employers: 0,
+      })
     } catch (error) {
       console.error(error)
-      setLoadError('')
+      setLoadError('We could not load the latest jobs and workers right now. Please try again soon.')
       setJobs([])
       setWorkers([])
       setDashboardStats(null)
@@ -91,7 +95,22 @@ const HomePage = () => {
     load()
   }, [])
 
-  const getWorkerImage = (worker, index) => worker.image || worker.photo || workerImages[index % workerImages.length]
+  const getWorkerImage = (worker, index) => {
+    const categoryKey = normalize(worker.category || worker.profession || '')
+    const categoryImages = {
+      farmer: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=800&q=80',
+      driver: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
+      electrician: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=800&q=80',
+      plumber: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80',
+      labour: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=800&q=80',
+    }
+
+    if (categoryImages[categoryKey]) {
+      return categoryImages[categoryKey]
+    }
+
+    return worker.photo || worker.image || workerImages[index % workerImages.length]
+  }
 
   const normalize = (value = '') => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ')
 
@@ -126,7 +145,7 @@ const HomePage = () => {
   const liveStats = [
     dashboardStats?.workers ? { label: 'Verified workers', value: `${dashboardStats.workers}` } : null,
     dashboardStats?.totalJobs ? { label: 'Open jobs', value: `${dashboardStats.totalJobs}` } : null,
-    dashboardStats?.employers ? { label: 'Active employers', value: `${dashboardStats.employers}` } : null,
+    { label: 'Active categories', value: `${categories.length}` },
   ].filter(Boolean)
 
   return (
@@ -139,9 +158,9 @@ const HomePage = () => {
         <div className="relative mx-auto max-w-7xl rounded-[32px] border border-white/20 bg-white/10 p-4 shadow-2xl backdrop-blur-xl sm:p-6 lg:p-8">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
             <div className="max-w-2xl text-white">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-blue-100">
+              {/* <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-blue-100">
                 <Sparkles size={16} /> {ui.heroBadge}
-              </div>
+              </div> */}
               <h1 className="text-3xl font-semibold leading-tight sm:text-4xl lg:text-5xl">{ui.heroTitle}</h1>
               <p className="mt-4 max-w-xl text-base text-blue-50 sm:text-lg">{ui.heroText}</p>
               <div className="mt-6 flex flex-wrap gap-2 sm:gap-3">
@@ -238,7 +257,7 @@ const HomePage = () => {
 
       <section id="featured-jobs-section" className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">{ui.featuredJobs}</p>
@@ -257,11 +276,11 @@ const HomePage = () => {
                     <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700">{job.salary}</span>
                   </div>
                 </div>
-              )) : <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">{jobs.length === 0 ? t('common.noJobsAvailable') : ui.noJobs}</p>}
+              )) : <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">{jobs.length === 0 ? 'No jobs are live yet. New openings will appear here as employers publish them.' : 'No jobs match this category yet. Try another filter or come back soon for fresh listings.'}</p>}
             </div>
-          </div>
+          </motion.div>
 
-          <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">{ui.topWorkers}</p>
@@ -283,10 +302,14 @@ const HomePage = () => {
                     <span className="flex items-center gap-1 text-amber-500"><BadgeCheck size={14} />{worker.ratings || '4.9'}</span>
                     <span>₹{worker.price || 500}/day</span>
                   </div>
+                  <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700">{worker.category || worker.profession || 'General'}</span>
+                    <span>{worker.completedJobs || 0} jobs</span>
+                  </div>
                 </div>
-              )) : <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500 sm:col-span-2">Worker profiles will appear here once accounts are created.</p>}
+              )) : <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500 sm:col-span-2">No workers are available in this category yet. Fresh verified profiles will appear here soon.</p>}
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 

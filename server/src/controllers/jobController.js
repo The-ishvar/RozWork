@@ -1,8 +1,23 @@
 import Job from '../models/Job.js'
 import Booking from '../models/Booking.js'
 import Notification from '../models/Notification.js'
+import Payment from '../models/Payment.js'
+import User from '../models/User.js'
+import Setting from '../models/Setting.js'
 import { createNotification, notifyAdmins } from '../utils/notify.js'
 import { recordUserActivity } from '../utils/activity.js'
+import { emitPlatformEvent } from '../utils/events.js'
+
+const defaultPlatformSettings = {
+  platformCommission: 5,
+  applicationFee: 20,
+  premiumPrice: 99,
+}
+
+const loadPlatformSettings = async () => {
+  const settings = await Setting.find({}).lean()
+  return { ...defaultPlatformSettings, ...Object.fromEntries(settings.map((item) => [item.key, item.value])) }
+}
 
 const normalizeGoal = (goal) => String(goal || '').trim().toLowerCase()
 
@@ -249,10 +264,24 @@ export const applyToJob = async (req, res, next) => {
       return res.status(404).json({ message: 'Job not found' })
     }
 
+    const applicant = await User.findById(req.user.id)
+    const settings = await loadPlatformSettings()
+    const hasActivePremium = !!applicant?.isPremium && (!applicant.premiumExpiryDate || new Date(applicant.premiumExpiryDate) > new Date())
+    const applicationFee = hasActivePremium ? 0 : Number(settings.applicationFee ?? 20)
+
     if (!job.applicants.includes(req.user.id)) {
       job.applicants.push(req.user.id)
       await job.save()
     }
+
+    const payment = await Payment.create({
+      userId: req.user.id,
+      workerId: req.user.id,
+      amount: applicationFee,
+      paymentType: 'application_fee',
+      status: 'completed',
+      transactionId: `application_${Date.now()}`,
+    })
 
     const existingBooking = await Booking.findOne({ jobId: job._id.toString(), workerId: req.user.id, employerId: job.postedBy })
     if (!existingBooking) {
@@ -302,7 +331,25 @@ export const applyToJob = async (req, res, next) => {
       }),
     ])
 
-    return res.status(201).json({ application: { jobId: job._id.toString(), userId: req.user.id, status: 'pending' } })
+    emitPlatformEvent('application.created', {
+      jobId: job._id.toString(),
+      employerId: job.postedBy?.toString(),
+      workerId: req.user.id,
+      amount: payment.amount,
+      paymentType: payment.paymentType,
+      premiumWaived: hasActivePremium,
+    })
+
+    return res.status(201).json({
+      application: { jobId: job._id.toString(), userId: req.user.id, status: 'pending' },
+      payment: {
+        id: payment._id.toString(),
+        amount: payment.amount,
+        paymentType: payment.paymentType,
+        status: payment.status,
+        transactionId: payment.transactionId,
+      },
+    })
   } catch (error) {
     console.error('jobs.apply failed', error)
     next(error)

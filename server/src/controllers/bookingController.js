@@ -3,8 +3,20 @@ import Payment from '../models/Payment.js'
 import Job from '../models/Job.js'
 import Transaction from '../models/Transaction.js'
 import User from '../models/User.js'
+import Setting from '../models/Setting.js'
 import { createNotification, notifyAdmins } from '../utils/notify.js'
 import { recordUserActivity } from '../utils/activity.js'
+import { emitPlatformEvent } from '../utils/events.js'
+
+const defaultPlatformSettings = {
+  platformCommission: 5,
+  applicationFee: 20,
+}
+
+const loadPlatformSettings = async () => {
+  const settings = await Setting.find({}).lean()
+  return { ...defaultPlatformSettings, ...Object.fromEntries(settings.map((item) => [item.key, item.value])) }
+}
 
 const serializeBooking = (booking) => ({
   id: booking._id ? booking._id.toString() : booking.id,
@@ -20,6 +32,9 @@ const serializeBooking = (booking) => ({
   price: booking.price ?? booking.amount ?? 0,
   category: booking.category || 'General',
   currency: booking.currency,
+  platformCommissionPercentage: booking.platformCommissionPercentage || 0,
+  platformCommissionAmount: booking.platformCommissionAmount || 0,
+  workerAmount: booking.workerAmount || 0,
   status: booking.status,
   verified: booking.verified ?? false,
   verificationStatus: booking.verificationStatus || 'pending',
@@ -58,6 +73,19 @@ export const createBooking = async (req, res, next) => {
     }
 
     const amount = Number(req.body.price ?? req.body.amount ?? req.body.budget ?? 0)
+    const transactionId = req.body.transactionId || `booking_${Date.now()}`
+    const bookingFee = 20
+
+    const payment = await Payment.create({
+      userId: employerId,
+      employerId,
+      workerId,
+      amount: bookingFee,
+      paymentType: 'booking_fee',
+      status: 'completed',
+      transactionId: `${transactionId}_fee`,
+    })
+
     const booking = await Booking.create({
       employerId,
       workerId,
@@ -74,10 +102,13 @@ export const createBooking = async (req, res, next) => {
       contactName: req.body.contactName || req.user.name,
       contactEmail: req.body.contactEmail || req.user.email,
       contactPhone: req.body.contactPhone || req.user.phone || '',
-      transactionId: req.body.transactionId || `booking_${Date.now()}`,
+      transactionId,
       status: req.body.status || 'pending',
-      paymentStatus: req.body.paymentStatus || 'pending',
+      paymentStatus: 'paid',
     })
+
+    payment.bookingId = booking._id
+    await payment.save()
 
     await Promise.allSettled([
       createNotification({
@@ -117,7 +148,19 @@ export const createBooking = async (req, res, next) => {
       }),
     ])
 
-    return res.status(201).json({ booking: serializeBooking(booking) })
+    emitPlatformEvent('booking.created', {
+      bookingId: booking._id.toString(),
+      employerId: booking.employerId?.toString(),
+      workerId: booking.workerId?.toString(),
+      amount: booking.amount,
+      paymentAmount: payment?.amount || 0,
+      paymentType: payment?.paymentType || 'booking_fee',
+    })
+
+    return res.status(201).json({
+      booking: serializeBooking(booking),
+      payment: payment ? { id: payment._id.toString(), amount: payment.amount, paymentType: payment.paymentType, status: payment.status, transactionId: payment.transactionId } : null,
+    })
   } catch (error) {
     console.error('bookings.create failed', error)
     next(error)
@@ -257,25 +300,33 @@ export const verifyBooking = async (req, res, next) => {
       return res.status(400).json({ message: `Booking is not awaiting verification.` })
     }
 
+    const settings = await loadPlatformSettings()
+    const amount = Number(booking.amount || booking.price || 0)
+    const platformCommissionPercentage = Number(settings.platformCommission ?? 5)
+    const platformCommissionAmount = Number(((amount * platformCommissionPercentage) / 100).toFixed(2))
+    const workerAmount = Math.max(0, amount - platformCommissionAmount)
+
     booking.status = 'completed'
     booking.verified = true
     booking.verificationStatus = 'approved'
     booking.paymentStatus = 'paid'
     booking.completedAt = new Date()
+    booking.platformCommissionPercentage = platformCommissionPercentage
+    booking.platformCommissionAmount = platformCommissionAmount
+    booking.workerAmount = workerAmount
     await booking.save()
 
     const worker = await User.findById(booking.workerId)
     const employer = await User.findById(booking.employerId || booking.userId || booking.providerId)
-    const amount = Number(booking.amount || booking.price || 0)
 
     if (worker) {
-      worker.earnings = Number(worker.earnings || 0) + amount
+      worker.earnings = Number(worker.earnings || 0) + workerAmount
       worker.completedJobs = Number(worker.completedJobs || 0) + 1
       await worker.save()
     }
 
     if (employer) {
-      employer.earnings = Number(employer.earnings || 0) + amount
+      employer.totalSpent = Number(employer.totalSpent || 0) + amount
       employer.completedJobs = Number(employer.completedJobs || 0) + 1
       await employer.save()
     }
@@ -283,11 +334,17 @@ export const verifyBooking = async (req, res, next) => {
     await Job.findByIdAndUpdate(booking.jobId, { status: 'completed' }, { new: true }).catch(() => {})
 
     const payment = await Payment.create({
+      userId: booking.employerId || booking.userId || booking.providerId,
       workerId: booking.workerId,
       employerId: booking.employerId || booking.userId || booking.providerId,
       bookingId: booking._id,
       amount,
+      totalAmount: amount,
+      commissionAmount: platformCommissionAmount,
+      workerAmount,
+      paymentType: 'service_payment',
       status: 'completed',
+      transactionId: booking.transactionId || `service_${Date.now()}`,
       date: new Date(),
     })
 

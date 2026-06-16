@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Briefcase, MapPin, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-
-const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Driver', 'Delivery Boy', 'Farmer', 'Labour', 'House Helper', 'Cleaner', 'Mechanic', 'AC Repair', 'Mobile Repair', 'Computer Repair', 'Tutor', 'Freelancer', 'Other']
-const workTypeOptions = ['Full Time', 'Part Time', 'Daily Wage', 'Contract', 'Temporary']
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+
+const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Driver', 'Delivery Boy', 'Farmer', 'Labour', 'House Helper', 'Cleaner', 'Mechanic', 'AC Repair', 'Mobile Repair', 'Computer Repair', 'Tutor', 'Freelancer', 'Other']
+const workTypeOptions = ['Full Time', 'Part Time', 'Daily Wage', 'Contract', 'Temporary']
 
 const goalOptions = [
   { id: 'all', labelKey: 'jobs.allWork' },
@@ -55,7 +55,6 @@ const JobsPage = () => {
   const loadJobs = async () => {
     const { data } = await apiClient.get('/jobs')
     setJobs(data.jobs || [])
-    console.log(data,'job object')
   }
 
   useEffect(() => {
@@ -144,8 +143,12 @@ const JobsPage = () => {
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">{t('jobs.title')}</p>
             <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{t('jobs.heroTitle')}</h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-600">Standard applications and booking requests include a small platform fee. Premium members unlock fee-free applications and revenue-friendly access to more opportunities.</p>
           </div>
-          <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">{t('jobs.heroBadge')}</div>
+          <div className="flex flex-wrap gap-2">
+            <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">{t('jobs.heroBadge')}</div>
+            {user?.isPremium ? <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">Premium active</div> : <div className="rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">Upgrade for fee-free applications</div>}
+          </div>
         </div>
       </div>
 

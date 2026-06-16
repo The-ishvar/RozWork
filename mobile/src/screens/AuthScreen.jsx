@@ -2,11 +2,13 @@ import React, { useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 
 export default function AuthScreen() {
    const navigation = useNavigation()
    const { login, register } = useAuth()
+   const { t } = useLanguage()
    const { theme } = useTheme()
    const [mode, setMode] = useState('login')
    const [name, setName] = useState('')
@@ -17,8 +19,14 @@ export default function AuthScreen() {
 
    const isLogin = mode === 'login'
 
-   const title = useMemo(() => (isLogin ? 'Welcome back' : 'Create your account'), [isLogin])
-   const subtitle = useMemo(() => (isLogin ? 'Securely access RozWork from your mobile device.' : 'Join millions of workers, employers, and service seekers.'), [isLogin])
+   const title = useMemo(
+      () => (isLogin ? t('auth.welcomeBack', 'Welcome back') : t('auth.createAccount', 'Create your account')),
+      [isLogin, t]
+   )
+   const subtitle = useMemo(
+      () => (isLogin ? t('auth.securelyAccess', 'Securely access RozWork from your mobile device.') : t('auth.joinMillions', 'Join millions of workers, employers, and service seekers.')),
+      [isLogin, t]
+   )
 
    const handleSubmit = async () => {
       try {
@@ -43,17 +51,17 @@ export default function AuthScreen() {
 
             <View style={styles.switchRow}>
                <Pressable style={[styles.switchButton, !isLogin && styles.switchActive, { borderColor: theme.border }]} onPress={() => setMode('login')}>
-                  <Text style={[styles.switchText, { color: isLogin ? theme.primary : theme.muted }]}>Login</Text>
+                  <Text style={[styles.switchText, { color: isLogin ? theme.primary : theme.muted }]}>{t('auth.login', 'Login')}</Text>
                </Pressable>
                <Pressable style={[styles.switchButton, isLogin && styles.switchActive, { borderColor: theme.border }]} onPress={() => setMode('register')}>
-                  <Text style={[styles.switchText, { color: !isLogin ? theme.primary : theme.muted }]}>Register</Text>
+                  <Text style={[styles.switchText, { color: !isLogin ? theme.primary : theme.muted }]}>{t('auth.register', 'Register')}</Text>
                </Pressable>
             </View>
 
             {!isLogin ? (
                <TextInput
                   style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                  placeholder="Full name"
+                  placeholder={t('auth.fullName', 'Full name')}
                   placeholderTextColor={theme.muted}
                   value={name}
                   onChangeText={setName}
@@ -62,7 +70,7 @@ export default function AuthScreen() {
 
             <TextInput
                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-               placeholder="Email or phone"
+               placeholder={t('auth.emailOrPhone', 'Email or phone')}
                placeholderTextColor={theme.muted}
                autoCapitalize="none"
                value={email || phone}
@@ -75,7 +83,7 @@ export default function AuthScreen() {
             {!isLogin ? (
                <TextInput
                   style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                  placeholder="Phone"
+                  placeholder={t('auth.phone', 'Phone')}
                   placeholderTextColor={theme.muted}
                   keyboardType="phone-pad"
                   value={phone}
@@ -85,7 +93,7 @@ export default function AuthScreen() {
 
             <TextInput
                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-               placeholder="Password"
+               placeholder={t('auth.password', 'Password')}
                placeholderTextColor={theme.muted}
                secureTextEntry
                value={password}
@@ -93,12 +101,12 @@ export default function AuthScreen() {
             />
 
             <Pressable style={[styles.primaryButton, { backgroundColor: theme.primary }]} onPress={handleSubmit} disabled={loading}>
-               <Text style={styles.buttonText}>{loading ? 'Please wait...' : isLogin ? 'Login' : 'Register'}</Text>
+               <Text style={styles.buttonText}>{loading ? t('auth.pleaseWait', 'Please wait...') : isLogin ? t('auth.login', 'Login') : t('auth.register', 'Register')}</Text>
             </Pressable>
 
             {isLogin ? (
                <Pressable onPress={() => navigation.navigate('ForgotPassword')}>
-                  <Text style={[styles.linkText, { color: theme.primary }]}>Forgot password?</Text>
+                  <Text style={[styles.linkText, { color: theme.primary }]}>{t('auth.forgotPassword', 'Forgot password?')}</Text>
                </Pressable>
             ) : null}
          </View>

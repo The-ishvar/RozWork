@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 import apiClient from '../api/client'
 
 export default function HomeScreen() {
    const navigation = useNavigation()
    const { user } = useAuth()
+   const { t } = useLanguage()
    const { theme } = useTheme()
    const [jobs, setJobs] = useState([])
    const [workers, setWorkers] = useState([])
@@ -52,35 +54,35 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
          <View style={[styles.heroCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View>
-               <Text style={[styles.eyebrow, { color: theme.primary }]}>RozWork mobile</Text>
-               <Text style={[styles.title, { color: theme.text }]}>Hello {user?.name || 'there'}</Text>
-               <Text style={[styles.subtitle, { color: theme.muted }]}>Your secure, mobile-first workspace for jobs, bookings, and growth.</Text>
+               <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('home.heroEyebrow', 'RozWork mobile')}</Text>
+               <Text style={[styles.title, { color: theme.text }]}>{t('home.heroTitle', 'Hello')} {user?.name || t('home.heroGreetingFallback', 'there')}</Text>
+               <Text style={[styles.subtitle, { color: theme.muted }]}>{t('home.heroSubtitle', 'Your secure, mobile-first workspace for jobs, bookings, and growth.')}</Text>
             </View>
             <Pressable style={[styles.primaryButton, { backgroundColor: theme.primary }]} onPress={() => navigation.navigate('Search')}>
-               <Text style={styles.buttonText}>Browse now</Text>
+               <Text style={styles.buttonText}>{t('home.browseNow', 'Browse now')}</Text>
             </Pressable>
          </View>
 
          <View style={styles.statsRow}>
             <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                <Text style={[styles.statValue, { color: theme.text }]}>{jobs.length}</Text>
-               <Text style={[styles.statLabel, { color: theme.muted }]}>Open jobs</Text>
+               <Text style={[styles.statLabel, { color: theme.muted }]}>{t('home.openJobs', 'Open jobs')}</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                <Text style={[styles.statValue, { color: theme.text }]}>{notifications.length}</Text>
-               <Text style={[styles.statLabel, { color: theme.muted }]}>Alerts</Text>
+               <Text style={[styles.statLabel, { color: theme.muted }]}>{t('home.alerts', 'Alerts')}</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                <Text style={[styles.statValue, { color: theme.text }]}>{workers.length}</Text>
-               <Text style={[styles.statLabel, { color: theme.muted }]}>Workers</Text>
+               <Text style={[styles.statLabel, { color: theme.muted }]}>{t('home.workers', 'Workers')}</Text>
             </View>
          </View>
 
          <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.rowBetween}>
-               <Text style={[styles.sectionTitle, { color: theme.text }]}>Featured opportunities</Text>
+               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('home.featuredOpportunities', 'Featured opportunities')}</Text>
                <Pressable onPress={() => navigation.navigate('Jobs')}>
-                  <Text style={{ color: theme.primary }}>View all</Text>
+                  <Text style={{ color: theme.primary }}>{t('home.viewAll', 'View all')}</Text>
                </Pressable>
             </View>
             {loading ? <ActivityIndicator style={{ marginTop: 12 }} color={theme.primary} /> : jobs.slice(0, 3).map((job) => (
@@ -90,7 +92,7 @@ export default function HomeScreen() {
                      <Text style={[styles.itemMeta, { color: theme.muted }]}>{job.category} • {job.location}</Text>
                   </View>
                   <Pressable style={[styles.smallButton, { backgroundColor: theme.primary }]} onPress={() => handleApply(job.id)}>
-                     <Text style={styles.buttonText}>Apply</Text>
+                     <Text style={styles.buttonText}>{t('home.apply', 'Apply')}</Text>
                   </Pressable>
                </View>
             ))}
@@ -98,9 +100,9 @@ export default function HomeScreen() {
 
          <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.rowBetween}>
-               <Text style={[styles.sectionTitle, { color: theme.text }]}>Top professionals</Text>
+               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('home.topProfessionals', 'Top professionals')}</Text>
                <Pressable onPress={() => navigation.navigate('Search')}>
-                  <Text style={{ color: theme.primary }}>Search</Text>
+                  <Text style={{ color: theme.primary }}>{t('home.search', 'Search')}</Text>
                </Pressable>
             </View>
             {workers.slice(0, 3).map((worker) => (
@@ -110,7 +112,7 @@ export default function HomeScreen() {
                      <Text style={[styles.itemMeta, { color: theme.muted }]}>{worker.profession} • {worker.location}</Text>
                   </View>
                   <Pressable style={[styles.smallButton, { backgroundColor: theme.accent }]} onPress={() => navigation.navigate('Booking', { worker, serviceTitle: worker.profession, amount: worker.price })}>
-                     <Text style={styles.buttonText}>Book</Text>
+                     <Text style={styles.buttonText}>{t('home.book', 'Book')}</Text>
                   </Pressable>
                </View>
             ))}

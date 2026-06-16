@@ -7,7 +7,22 @@ import Service from '../models/Service.js'
 import Transaction from '../models/Transaction.js'
 import LoginHistory from '../models/LoginHistory.js'
 import UserActivity from '../models/UserActivity.js'
+import Payment from '../models/Payment.js'
+import Setting from '../models/Setting.js'
 import { getAuditLogs } from '../utils/audit.js'
+
+const defaultPlatformSettings = {
+  siteName: 'RozWork',
+  maintenanceMode: false,
+  platformCommission: 5,
+  premiumPrice: 99,
+  applicationFee: 20,
+}
+
+const loadPlatformSettings = async () => {
+  const settings = await Setting.find({}).lean()
+  return { ...defaultPlatformSettings, ...Object.fromEntries(settings.map((item) => [item.key, item.value])) }
+}
 
 const serializeJobForAdmin = (job) => ({
   id: job._id ? job._id.toString() : job.id,
@@ -118,16 +133,23 @@ export const getUserActivities = async (req, res, next) => {
 
 export const getStats = async (_req, res, next) => {
   try {
-    const [users, jobs, bookings, purchases, notifications, transactions] = await Promise.all([
+    const [users, jobs, bookings, purchases, notifications, transactions, payments] = await Promise.all([
       User.find().lean(),
       Job.find().lean(),
       Booking.find().lean(),
       Purchase.find().lean(),
       Notification.find().lean(),
       Transaction.find().lean(),
+      Payment.find({ status: 'completed' }).sort({ createdAt: -1 }).lean(),
     ])
 
-    const totalRevenue = purchases.reduce((sum, purchase) => sum + Number(purchase.amount || 0), 0)
+    const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const todayRevenue = payments.filter((payment) => payment.createdAt && new Date(payment.createdAt).toDateString() === new Date().toDateString()).reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const monthlyRevenue = payments.filter((payment) => payment.createdAt && new Date(payment.createdAt).getMonth() === new Date().getMonth() && new Date(payment.createdAt).getFullYear() === new Date().getFullYear()).reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const applicationFeeRevenue = payments.filter((payment) => payment.paymentType === 'application_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const bookingFeeRevenue = payments.filter((payment) => payment.paymentType === 'booking_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const premiumRevenue = payments.filter((payment) => payment.paymentType === 'premium_membership').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+
     const stats = {
       totalUsers: users.length,
       totalWorkers: users.filter((user) => user.role === 'worker').length,
@@ -135,11 +157,17 @@ export const getStats = async (_req, res, next) => {
       totalBookings: bookings.length,
       totalJobs: jobs.length,
       totalRevenue,
+      todayRevenue,
+      monthlyRevenue,
+      applicationFeeRevenue,
+      bookingFeeRevenue,
+      premiumRevenue,
       totalNotifications: notifications.length,
       activeUsers: users.filter((user) => !user.isSuspended && !user.isBanned).length,
       pendingJobs: jobs.filter((job) => job.status === 'pending').length,
       completedBookings: bookings.filter((booking) => booking.status === 'completed').length,
       totalTransactions: transactions.length,
+      premiumUsers: users.filter((user) => user.isPremium).length,
     }
 
     return res.json({ stats })
@@ -151,13 +179,27 @@ export const getStats = async (_req, res, next) => {
 
 export const getOverview = async (_req, res, next) => {
   try {
-    const [users, jobs, bookings, purchases, notifications] = await Promise.all([
+    const [users, jobs, bookings, purchases, notifications, payments] = await Promise.all([
       User.find().lean(),
       Job.find().sort({ createdAt: -1 }).lean(),
       Booking.find().sort({ createdAt: -1 }).lean(),
       Purchase.find().sort({ createdAt: -1 }).lean(),
       Notification.find().sort({ createdAt: -1 }).lean(),
+      Payment.find({ status: 'completed' }).sort({ createdAt: -1 }).lean(),
     ])
+
+    const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const applicationFeeRevenue = payments.filter((payment) => payment.paymentType === 'application_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const bookingFeeRevenue = payments.filter((payment) => payment.paymentType === 'booking_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const premiumRevenue = payments.filter((payment) => payment.paymentType === 'premium_membership').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const revenueByMonth = Array.from({ length: 6 }, (_, index) => {
+      const month = new Date()
+      month.setMonth(month.getMonth() - index)
+      const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
+      const value = payments.filter((payment) => payment.createdAt && `${new Date(payment.createdAt).getFullYear()}-${String(new Date(payment.createdAt).getMonth() + 1).padStart(2, '0')}` === key).reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+      return { label: month.toLocaleString('default', { month: 'short' }), value }
+    }).reverse()
+    const topEarningWorkers = users.filter((user) => user.role === 'worker').sort((left, right) => Number(right.earnings || 0) - Number(left.earnings || 0)).slice(0, 5).map((user) => ({ name: user.name, earnings: Number(user.earnings || 0), category: user.profession || 'Worker' }))
 
     const stats = {
       totalUsers: users.length,
@@ -165,8 +207,12 @@ export const getOverview = async (_req, res, next) => {
       totalEmployers: users.filter((user) => user.role === 'employer').length,
       totalBookings: bookings.length,
       totalJobs: jobs.length,
-      totalRevenue: purchases.reduce((sum, purchase) => sum + Number(purchase.amount || 0), 0),
+      totalRevenue,
       totalNotifications: notifications.length,
+      applicationFeeRevenue,
+      bookingFeeRevenue,
+      premiumRevenue,
+      premiumUsers: users.filter((user) => user.isPremium).length,
     }
 
     return res.json({
@@ -184,6 +230,14 @@ export const getOverview = async (_req, res, next) => {
       pendingContent: jobs.filter((job) => job.status === 'pending').slice(0, 6),
       recentPurchases: purchases.slice(0, 6),
       auditLogs: getAuditLogs().slice(0, 10),
+      revenueAnalytics: {
+        totalRevenue,
+        applicationFeeRevenue,
+        bookingFeeRevenue,
+        premiumRevenue,
+        revenueByMonth,
+        topEarningWorkers,
+      },
     })
   } catch (error) {
     console.error('admin.getOverview failed', error)
@@ -321,9 +375,30 @@ export const deleteContent = async (req, res, next) => {
   }
 }
 
-export const getSettings = async (_req, res) => res.json({ settings: { siteName: 'RozWork', maintenanceMode: false } })
+export const getSettings = async (_req, res, next) => {
+  try {
+    const settings = await loadPlatformSettings()
+    return res.json({ settings })
+  } catch (error) {
+    console.error('admin.getSettings failed', error)
+    next(error)
+  }
+}
 
-export const updateSettings = async (req, res) => res.json({ settings: req.body })
+export const updateSettings = async (req, res, next) => {
+  try {
+    const updates = { ...req.body }
+    const entries = Object.entries(updates)
+    for (const [key, value] of entries) {
+      await Setting.findOneAndUpdate({ key }, { key, value }, { upsert: true, new: true })
+    }
+    const settings = await loadPlatformSettings()
+    return res.json({ settings })
+  } catch (error) {
+    console.error('admin.updateSettings failed', error)
+    next(error)
+  }
+}
 
 export const getNotifications = async (_req, res, next) => {
   try {

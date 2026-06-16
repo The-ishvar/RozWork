@@ -2,11 +2,13 @@ import React, { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 
 export default function ForgotPasswordScreen() {
    const navigation = useNavigation()
    const { forgotPassword, verifyOtp, resetPassword, otpPhone, setOtpPhone } = useAuth()
+   const { t } = useLanguage()
    const { theme } = useTheme()
    const [step, setStep] = useState('request')
    const [phone, setPhone] = useState(otpPhone)
@@ -44,14 +46,13 @@ export default function ForgotPasswordScreen() {
    return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.title, { color: theme.text }]}>Recover your password</Text>
-            <Text style={[styles.subtitle, { color: theme.muted }]}>Use the mobile OTP flow connected to the existing RozWork auth APIs.</Text>
-
+            <Text style={[styles.title, { color: theme.text }]}>{t('forgotPassword.title', 'Recover your password')}</Text>
+            <Text style={[styles.subtitle, { color: theme.muted }]}>{t('forgotPassword.subtitle', 'Use the mobile OTP flow connected to the existing RozWork auth APIs.')}</Text>
             {step === 'request' ? (
                <>
                   <TextInput
                      style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                     placeholder="Phone number"
+                     placeholder={t('forgotPassword.phoneNumber', 'Phone number')}
                      placeholderTextColor={theme.muted}
                      value={phone}
                      onChangeText={(value) => {
@@ -61,14 +62,14 @@ export default function ForgotPasswordScreen() {
                      keyboardType="phone-pad"
                   />
                   <Pressable style={[styles.button, { backgroundColor: theme.primary }]} onPress={requestOtp} disabled={loading}>
-                     <Text style={styles.buttonText}>{loading ? 'Please wait...' : 'Send OTP'}</Text>
+                     <Text style={styles.buttonText}>{loading ? t('auth.pleaseWait', 'Please wait...') : t('forgotPassword.sendOtp', 'Send OTP')}</Text>
                   </Pressable>
                </>
             ) : (
                <>
                   <TextInput
                      style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                     placeholder="OTP"
+                     placeholder={t('forgotPassword.otp', 'OTP')}
                      placeholderTextColor={theme.muted}
                      value={otp}
                      onChangeText={setOtp}
@@ -76,20 +77,20 @@ export default function ForgotPasswordScreen() {
                   />
                   <TextInput
                      style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                     placeholder="New password"
+                     placeholder={t('forgotPassword.newPassword', 'New password')}
                      placeholderTextColor={theme.muted}
                      value={password}
                      secureTextEntry
                      onChangeText={setPassword}
                   />
                   <Pressable style={[styles.button, { backgroundColor: theme.primary }]} onPress={verifyAndReset} disabled={loading}>
-                     <Text style={styles.buttonText}>{loading ? 'Working...' : 'Reset password'}</Text>
+                     <Text style={styles.buttonText}>{loading ? t('forgotPassword.working', 'Working...') : t('forgotPassword.resetPassword', 'Reset password')}</Text>
                   </Pressable>
                </>
             )}
 
             <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
-               <Text style={[styles.linkText, { color: theme.primary }]}>Back to login</Text>
+               <Text style={[styles.linkText, { color: theme.primary }]}>{t('forgotPassword.backToLogin', 'Back to login')}</Text>
             </Pressable>
          </View>
       </View>

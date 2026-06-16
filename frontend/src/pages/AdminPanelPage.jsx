@@ -21,6 +21,7 @@ import {
 import { Navigate } from 'react-router-dom'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const defaultSettings = {
   siteName: 'RozWork',
@@ -33,6 +34,7 @@ const defaultSettings = {
 
 const AdminPanelPage = () => {
   const { user, token } = useAuth()
+  const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -309,6 +311,10 @@ const AdminPanelPage = () => {
         <div className="flex items-center gap-2 text-rose-600"><CheckCircle2 size={18} /> Reviews</div>
         <p className="mt-4 text-3xl font-semibold text-slate-900">{stats.totalReviews || 0}</p>
       </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-fuchsia-600"><ShieldCheck size={18} /> Premium members</div>
+        <p className="mt-4 text-3xl font-semibold text-slate-900">{stats.premiumUsers || 0}</p>
+      </div>
     </div>
   )
 
@@ -330,13 +336,13 @@ const AdminPanelPage = () => {
           </div>
           <div className="mt-6 space-y-2">
             {[
-              { id: 'overview', label: 'Overview', icon: LayoutGrid },
-              { id: 'users', label: 'User Management', icon: Users },
-              { id: 'activity', label: 'Activity Log', icon: ShieldCheck },
-              { id: 'moderation', label: 'Moderation', icon: ClipboardList },
-              { id: 'content', label: 'Content', icon: BarChart3 },
-              { id: 'settings', label: 'Settings', icon: Settings },
-              { id: 'notifications', label: 'Notifications', icon: BellRing },
+              { id: 'overview', label: t('admin.navOverview', 'Overview'), icon: LayoutGrid },
+              { id: 'users', label: t('admin.navUsers', 'User Management'), icon: Users },
+              { id: 'activity', label: t('admin.navActivity', 'Activity Log'), icon: ShieldCheck },
+              { id: 'moderation', label: t('admin.navModeration', 'Moderation'), icon: ClipboardList },
+              { id: 'content', label: t('admin.navContent', 'Content'), icon: BarChart3 },
+              { id: 'settings', label: t('admin.navSettings', 'Settings'), icon: Settings },
+              { id: 'notifications', label: t('admin.navNotifications', 'Notifications'), icon: BellRing },
             ].map((item) => {
               const Icon = item.icon
               const isActive = activeTab === item.id
@@ -349,8 +355,8 @@ const AdminPanelPage = () => {
             })}
           </div>
           <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <div className="flex items-center gap-2 font-semibold text-slate-900"><Menu size={16} /> Control center</div>
-            <p className="mt-2">Approve new submissions, manage trusted accounts, and keep website content under review.</p>
+            <div className="flex items-center gap-2 font-semibold text-slate-900"><Menu size={16} /> {t('admin.controlCenter', 'Control center')}</div>
+            <p className="mt-2">{t('admin.controlCenterDescription', 'Approve new submissions, manage trusted accounts, and keep website content under review.')}</p>
           </div>
         </aside>
 
@@ -358,13 +364,13 @@ const AdminPanelPage = () => {
           <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-600">Operations dashboard</p>
-                <h2 className="mt-2 text-3xl font-semibold">Secure website control for RozWork</h2>
-                <p className="mt-2 max-w-2xl text-sm text-slate-500">Review registrations, moderate new content, manage users, and update site settings from a single responsive panel.</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-600">{t('admin.operationsDashboard', 'Operations dashboard')}</p>
+                <h2 className="mt-2 text-3xl font-semibold">{t('admin.websiteControlTitle', 'Secure website control for RozWork')}</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-500">{t('admin.websiteControlDescription', 'Review registrations, moderate new content, manage users, and update site settings from a single responsive panel.')}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => loadDashboard()} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"> <RefreshCw size={16} className="mr-2 inline" /> Refresh</button>
-                <button onClick={exportUsers} className="rounded-full bg-blue-600 px-3 py-2 text-sm font-medium text-white"> <Upload size={16} className="mr-2 inline" /> Export CSV</button>
+                <button onClick={() => loadDashboard()} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"> <RefreshCw size={16} className="mr-2 inline" /> {t('admin.refresh', 'Refresh')}</button>
+                <button onClick={exportUsers} className="rounded-full bg-blue-600 px-3 py-2 text-sm font-medium text-white"> <Upload size={16} className="mr-2 inline" /> {t('admin.exportCsv', 'Export CSV')}</button>
               </div>
             </div>
             {message ? <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div> : null}
@@ -377,8 +383,8 @@ const AdminPanelPage = () => {
                 <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold">Recent activity</h3>
-                      <p className="text-sm text-slate-500">Every registration, post, and admin action is logged here.</p>
+                      <h3 className="text-lg font-semibold">{t('admin.recentActivity', 'Recent activity')}</h3>
+                      <p className="text-sm text-slate-500">{t('admin.recentActivityDescription', 'Every registration, post, and admin action is logged here.')}</p>
                     </div>
                     <div className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-600">Live feed</div>
                   </div>
@@ -395,8 +401,8 @@ const AdminPanelPage = () => {
                 <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold">Growth chart</h3>
-                      <p className="text-sm text-slate-500">Last six months of signed-up users.</p>
+                      <h3 className="text-lg font-semibold">{t('admin.growthChart', 'Growth chart')}</h3>
+                      <p className="text-sm text-slate-500">{t('admin.growthChartDescription', 'Last six months of signed-up users.')}</p>
                     </div>
                     <div className="rounded-full bg-emerald-50 px-3 py-2 text-sm text-emerald-700">+{stats.totalUsers}</div>
                   </div>
@@ -419,8 +425,8 @@ const AdminPanelPage = () => {
                 <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold">Active users</h3>
-                      <p className="text-sm text-slate-500">Accounts that are currently eligible to use the platform.</p>
+                      <h3 className="text-lg font-semibold">{t('admin.activeUsers', 'Active users')}</h3>
+                      <p className="text-sm text-slate-500">{t('admin.activeUsersDescription', 'Accounts that are currently eligible to use the platform.')}</p>
                     </div>
                     <div className="rounded-full bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{stats.activeUsers}</div>
                   </div>
@@ -439,8 +445,8 @@ const AdminPanelPage = () => {
                 <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold">Recent logins</h3>
-                      <p className="text-sm text-slate-500">Recent sign-ins and authentications from the team and members.</p>
+                      <h3 className="text-lg font-semibold">{t('admin.recentLogins', 'Recent logins')}</h3>
+                      <p className="text-sm text-slate-500">{t('admin.recentLoginsDescription', 'Recent sign-ins and authentications from the team and members.')}</p>
                     </div>
                     <div className="rounded-full bg-blue-50 px-3 py-2 text-sm text-blue-700">{recentLogins.length}</div>
                   </div>
@@ -465,12 +471,12 @@ const AdminPanelPage = () => {
             <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold">User management</h3>
-                  <p className="text-sm text-slate-500">Search, edit, block, unblock, and remove accounts instantly.</p>
+                  <h3 className="text-lg font-semibold">{t('admin.userManagement', 'User management')}</h3>
+                  <p className="text-sm text-slate-500">{t('admin.userManagementDescription', 'Search, edit, block, unblock, and remove accounts instantly.')}</p>
                 </div>
                 <div className="relative w-full max-w-sm">
                   <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm" placeholder="Search users" />
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm" placeholder={t('admin.searchUsersPlaceholder', 'Search users')} />
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">

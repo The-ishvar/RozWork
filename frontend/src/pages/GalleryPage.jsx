@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ImageIcon, Search, Sparkles } from 'lucide-react'
 import apiClient from '../api/client'
+import { useLanguage } from '../context/LanguageContext'
 
 const GalleryPage = () => {
+   const { t } = useLanguage()
    const [gallery, setGallery] = useState([])
    const [query, setQuery] = useState('')
    const [category, setCategory] = useState('all')
@@ -44,23 +46,23 @@ const GalleryPage = () => {
          <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                <div className="max-w-2xl">
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">Gallery</p>
-                  <h1 className="mt-2 text-3xl font-semibold text-slate-900">A live portfolio of trusted work and verified stories</h1>
-                  <p className="mt-3 text-sm text-slate-500">Browse the latest marketplace highlights, featured services, and completed projects from the RozWork community.</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">{t('gallery.title', 'Gallery')}</p>
+                  <h1 className="mt-2 text-3xl font-semibold text-slate-900">{t('gallery.heroTitle', 'A live portfolio of trusted work and verified stories')}</h1>
+                  <p className="mt-3 text-sm text-slate-500">{t('gallery.heroSubtitle', 'Browse the latest marketplace highlights, featured services, and completed projects from the RozWork community.')}</p>
                </div>
                <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-                  <div className="flex items-center gap-2"><Sparkles size={16} /> Featured work</div>
+                  <div className="flex items-center gap-2"><Sparkles size={16} /> {t('gallery.featuredWork', 'Featured work')}</div>
                </div>
             </div>
 
             <div className="mt-6 grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
                <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <Search size={16} className="text-slate-400" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search gallery items" className="w-full border-0 bg-transparent text-sm outline-none" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('gallery.searchPlaceholder', 'Search gallery items')} className="w-full border-0 bg-transparent text-sm outline-none" />
                </label>
                <select value={category} onChange={(event) => setCategory(event.target.value)} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none">
                   {categories.map((option) => (
-                     <option key={option} value={option}>{option === 'all' ? 'All categories' : option}</option>
+                     <option key={option} value={option}>{option === 'all' ? t('gallery.allCategories', 'All categories') : option}</option>
                   ))}
                </select>
             </div>
@@ -68,14 +70,14 @@ const GalleryPage = () => {
 
          <section className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {loading ? (
-               <div className="rounded-[24px] border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500 md:col-span-2 xl:col-span-3">Loading gallery...</div>
+               <div className="rounded-[24px] border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500 md:col-span-2 xl:col-span-3">{t('gallery.loading', 'Loading gallery...')}</div>
             ) : filteredItems.length ? filteredItems.map((item) => (
                <article key={item.id} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
                   <img src={item.imageUrl} alt={item.imageAlt || item.title} className="h-48 w-full object-cover" />
                   <div className="p-5">
                      <div className="flex items-center justify-between gap-3">
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-700">{item.category}</span>
-                        {item.featured ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">Featured</span> : null}
+                        {item.featured ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">{t('gallery.featured', 'Featured')}</span> : null}
                      </div>
                      <h2 className="mt-4 text-xl font-semibold text-slate-900">{item.title}</h2>
                      <p className="mt-2 text-sm text-slate-500">{item.description}</p>
@@ -85,12 +87,12 @@ const GalleryPage = () => {
                         ))}
                      </div>
                      <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-                        <ImageIcon size={16} /> {item.location || 'Remote'}
+                        <ImageIcon size={16} /> {item.location || t('gallery.remote', 'Remote')}
                      </div>
                   </div>
                </article>
             )) : (
-               <div className="rounded-[24px] border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500 md:col-span-2 xl:col-span-3">No gallery items match the current search.</div>
+               <div className="rounded-[24px] border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500 md:col-span-2 xl:col-span-3">{t('gallery.noItems', 'No gallery items match the current search.')}</div>
             )}
          </section>
       </main>

@@ -3,7 +3,19 @@ import Booking from '../models/Booking.js'
 import Transaction from '../models/Transaction.js'
 import Notification from '../models/Notification.js'
 import User from '../models/User.js'
+import Payment from '../models/Payment.js'
+import Setting from '../models/Setting.js'
 import { notifyAdmins } from '../utils/notify.js'
+import { emitPlatformEvent } from '../utils/events.js'
+
+const defaultPlatformSettings = {
+  premiumPrice: 99,
+}
+
+const loadPlatformSettings = async () => {
+  const settings = await Setting.find({}).lean()
+  return { ...defaultPlatformSettings, ...Object.fromEntries(settings.map((item) => [item.key, item.value])) }
+}
 
 const serializePurchase = (purchase) => ({
   id: purchase._id ? purchase._id.toString() : purchase.id,
@@ -106,6 +118,90 @@ export const createPurchase = async (req, res, next) => {
   }
 }
 
+export const purchasePremiumMembership = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const settings = await loadPlatformSettings()
+    const premiumAmount = Number(settings.premiumPrice ?? 99)
+    const premiumTransactionId = `premium_${Date.now()}`
+    const payment = await Payment.create({
+      userId: user._id,
+      amount: premiumAmount,
+      paymentType: 'premium_membership',
+      status: 'completed',
+      transactionId: premiumTransactionId,
+    })
+
+    const premiumExpiryDate = new Date()
+    premiumExpiryDate.setMonth(premiumExpiryDate.getMonth() + 1)
+
+    user.isPremium = true
+    user.premiumPlan = 'monthly'
+    user.premiumExpiryDate = premiumExpiryDate
+    await user.save()
+
+    const purchase = await Purchase.create({
+      userId: user._id,
+      workerName: 'Premium Membership',
+      workerProfession: 'Platform Access',
+      service: 'Premium Membership',
+      amount: premiumAmount,
+      currency: 'INR',
+      status: 'completed',
+      reference: premiumTransactionId,
+    })
+
+    await Transaction.create({
+      userId: user._id,
+      type: 'purchase',
+      amount: premiumAmount,
+      currency: 'INR',
+      status: 'completed',
+      reference: premiumTransactionId,
+      description: 'Premium membership activation',
+    })
+
+    await notifyAdmins({
+      type: 'premium',
+      title: 'Premium membership activated',
+      message: `${user.name} activated a premium plan.`,
+      relatedId: user._id,
+      fromUserId: user._id,
+    })
+
+    emitPlatformEvent('premium.purchased', {
+      userId: user._id.toString(),
+      amount: premiumAmount,
+      paymentType: payment.paymentType,
+    })
+
+    return res.status(201).json({
+      message: 'Premium membership activated',
+      purchase: serializePurchase(purchase),
+      payment: {
+        id: payment._id.toString(),
+        amount: payment.amount,
+        paymentType: payment.paymentType,
+        status: payment.status,
+        transactionId: payment.transactionId,
+      },
+      user: {
+        id: user._id.toString(),
+        isPremium: user.isPremium,
+        premiumPlan: user.premiumPlan,
+        premiumExpiryDate: user.premiumExpiryDate,
+      },
+    })
+  } catch (error) {
+    console.error('purchases.premium failed', error)
+    next(error)
+  }
+}
+
 export const deletePurchase = async (req, res, next) => {
   try {
     const purchase = await Purchase.findOneAndDelete({ _id: req.params.id, userId: req.user.id })
@@ -121,4 +217,4 @@ export const deletePurchase = async (req, res, next) => {
   }
 }
 
-export default { listPurchases, createPurchase, deletePurchase }
+export default { listPurchases, createPurchase, purchasePremiumMembership, deletePurchase }

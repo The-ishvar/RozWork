@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const initialProfileState = {
   name: '',
@@ -21,6 +22,7 @@ const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter'
 
 const ProfilePage = () => {
   const { user, updateProfile, token } = useAuth()
+  const { t } = useLanguage()
   const location = useLocation()
   const [profile, setProfile] = useState(initialProfileState)
   const [stats, setStats] = useState({ totalJobsPosted: 0, totalBookings: 0 })
@@ -202,7 +204,7 @@ const ProfilePage = () => {
     }
   }
 
-  if (!user) return <div className="px-4 py-16 text-center text-slate-500">Please sign in to edit your profile.</div>
+  if (!user) return <div className="px-4 py-16 text-center text-slate-500">{t('profile.signInPrompt', 'Please sign in to edit your profile.')}</div>
 
   return (
     <div className={`min-h-screen px-4 py-8 transition-all duration-500 sm:px-6 lg:px-8 ${focusMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
@@ -223,9 +225,9 @@ const ProfilePage = () => {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={() => setFocusMode((value) => !value)} className={`rounded-full border px-4 py-2 text-sm font-medium ${focusMode ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{focusMode ? 'Exit focus mode' : 'Focus mode'}</button>
+              <button type="button" onClick={() => setFocusMode((value) => !value)} className={`rounded-full border px-4 py-2 text-sm font-medium ${focusMode ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{focusMode ? t('profile.exitFocusMode', 'Exit focus mode') : t('profile.focusMode', 'Focus mode')}</button>
               <button type="button" onClick={() => { setActiveSection('personal'); setIsEditorOpen(true) }} className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
-                <Edit3 size={16} /> Edit profile
+                <Edit3 size={16} /> {t('profile.editProfile', 'Edit profile')}
               </button>
             </div>
           </div>
@@ -235,32 +237,32 @@ const ProfilePage = () => {
           <div className={`rounded-[32px] border border-slate-200 p-6 shadow-sm sm:p-8 ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-600">Professional profile</p>
-                <h2 className="mt-2 text-xl font-semibold">Your profile is ready for a premium marketplace experience.</h2>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-600">{t('profile.professionalProfile', 'Professional profile')}</p>
+                <h2 className="mt-2 text-xl font-semibold">{t('profile.readyForMarketplace', 'Your profile is ready for a premium marketplace experience.')}</h2>
               </div>
               <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">{completionScore}% complete</div>
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className={`rounded-2xl border border-slate-200 p-4 ${focusMode ? 'bg-white/10' : 'bg-slate-50'}`}>
-                <div className="flex items-center gap-2"><Briefcase size={16} /> Jobs</div>
+                <div className="flex items-center gap-2"><Briefcase size={16} /> {t('profile.jobs', 'Jobs')}</div>
                 <p className="mt-3 text-2xl font-semibold">{stats.totalJobsPosted || 0}</p>
               </div>
               <div className={`rounded-2xl border border-slate-200 p-4 ${focusMode ? 'bg-white/10' : 'bg-slate-50'}`}>
-                <div className="flex items-center gap-2"><Wallet size={16} /> Bookings</div>
+                <div className="flex items-center gap-2"><Wallet size={16} /> {t('profile.bookings', 'Bookings')}</div>
                 <p className="mt-3 text-2xl font-semibold">{stats.totalBookings || 0}</p>
               </div>
             </div>
           </div>
 
           <div className={`rounded-[32px] border border-slate-200 p-6 shadow-sm sm:p-8 ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
-            <div className="flex items-center gap-2"><ShieldCheck size={16} /> Recent activity</div>
+            <div className="flex items-center gap-2"><ShieldCheck size={16} /> {t('profile.recentActivity', 'Recent activity')}</div>
             <div className="mt-6 space-y-4">
               {purchases.length ? purchases.slice(0, 4).map((purchase) => (
                 <div key={purchase.id} className={`rounded-2xl border border-slate-200 p-3 ${focusMode ? 'bg-white/10' : 'bg-slate-50'}`}>
-                  <p className="font-semibold">{purchase.workerName || purchase.service || 'Service booking'}</p>
+                  <p className="font-semibold">{purchase.workerName || purchase.service || t('profile.serviceBooking', 'Service booking')}</p>
                   <p className="mt-1 text-sm text-slate-500">₹{purchase.amount || 0}</p>
                 </div>
-              )) : <p className="text-sm text-slate-500">Your recent bookings will appear here.</p>}
+              )) : <p className="text-sm text-slate-500">{t('profile.noRecentBookings', 'Your recent bookings will appear here.')}</p>}
             </div>
           </div>
         </div>
@@ -270,10 +272,10 @@ const ProfilePage = () => {
         <section className={`rounded-[32px] border border-slate-200 p-6 shadow-sm ${focusMode ? 'bg-white/10' : 'bg-white'}`}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">My posts</p>
-              <h2 className="mt-2 text-xl font-semibold">Manage your posted jobs</h2>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">{t('profile.myPosts', 'My posts')}</p>
+              <h2 className="mt-2 text-xl font-semibold">{t('profile.managePostedJobs', 'Manage your posted jobs')}</h2>
             </div>
-            <span className="rounded-full bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">{myPosts.length} active</span>
+            <span className="rounded-full bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">{myPosts.length} {t('profile.active', 'active')}</span>
           </div>
           <div className="mt-6 space-y-3">
             {myPosts.length ? myPosts.map((post) => (
@@ -284,8 +286,8 @@ const ProfilePage = () => {
                     <p className="mt-1 text-sm text-slate-500">{post.category} • {post.location}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => openPostEditor(post)} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Edit</button>
-                    <button type="button" onClick={() => handleDeletePost(post.id)} className="rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700">Delete</button>
+                    <button type="button" onClick={() => openPostEditor(post)} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">{t('profile.edit', 'Edit')}</button>
+                    <button type="button" onClick={() => handleDeletePost(post.id)} className="rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700">{t('profile.delete', 'Delete')}</button>
                   </div>
                 </div>
               </div>
@@ -315,15 +317,15 @@ const ProfilePage = () => {
               <tbody className="divide-y divide-slate-100 bg-white">
                 {bookings.length ? bookings.map((booking) => (
                   <tr key={booking.id}>
-                    <td className="px-3 py-3 font-medium text-slate-900">{booking.serviceTitle || booking.jobTitle || 'Booking'}</td>
-                    <td className="px-3 py-3 text-slate-600">{booking.serviceProvider || booking.employerName || 'Employer'}</td>
+                    <td className="px-3 py-3 font-medium text-slate-900">{booking.serviceTitle || booking.jobTitle || t('profile.booking', 'Booking')}</td>
+                    <td className="px-3 py-3 text-slate-600">{booking.serviceProvider || booking.employerName || t('profile.employer', 'Employer')}</td>
                     <td className="px-3 py-3 text-slate-600">{new Date(booking.createdAt).toLocaleDateString()}</td>
                     <td className="px-3 py-3 text-slate-600">₹{booking.price || booking.amount || 0}</td>
                     <td className="px-3 py-3">
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : booking.status === 'accepted' ? 'bg-blue-100 text-blue-700' : booking.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{booking.status || 'Pending'}</span>
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : booking.status === 'accepted' ? 'bg-blue-100 text-blue-700' : booking.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{booking.status || t('profile.pending', 'Pending')}</span>
                     </td>
                   </tr>
-                )) : <tr><td className="px-3 py-3 text-sm text-slate-500" colSpan="5">No bookings yet. Apply to a job and it will show up here.</td></tr>}
+                )) : <tr><td className="px-3 py-3 text-sm text-slate-500" colSpan="5">{t('profile.noBookingsYet', 'No bookings yet. Apply to a job and it will show up here.')}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -499,8 +501,8 @@ const ProfilePage = () => {
                 ))}
 
                 <div className="flex flex-wrap justify-end gap-3">
-                  <button type="button" onClick={() => setIsEditorOpen(false)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                  <button type="button" onClick={() => { if (activeSection === 'password') { void handlePasswordUpdate() } else { void handleSaveProfile() } }} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">{loading ? 'Saving...' : 'Save profile'}</button>
+                  <button type="button" onClick={() => setIsEditorOpen(false)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">{t('common.cancel', 'Cancel')}</button>
+                  <button type="button" onClick={() => { if (activeSection === 'password') { void handlePasswordUpdate() } else { void handleSaveProfile() } }} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">{loading ? t('profile.saving', 'Saving...') : t('profile.saveProfile', 'Save profile')}</button>
                 </div>
               </div>
             </motion.div>
