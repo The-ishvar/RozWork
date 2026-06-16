@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const DEFAULT_API_URL = 'https://roz-1-xemo.onrender.com/api'
+const DEFAULT_API_URL = 'https://rozwork.onrender.com/api'
 
 const normalizeConfiguredUrl = (value) => {
   if (typeof value !== 'string') {
