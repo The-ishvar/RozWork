@@ -1,364 +1,558 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, BadgeCheck, Briefcase, Search, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import apiClient from '../api/client'
+import {
+  Search, MapPin, ArrowRight, Briefcase, Users, Star, TrendingUp,
+  Building2, Sprout, Clock, Truck, Wrench, Home, Hammer, GraduationCap,
+  Shirt, Monitor, ShoppingBag, Cog, ShieldCheck, ChevronRight, Zap,
+  IndianRupee, Bookmark, Share2
+} from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import client from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { JobCardSkeleton, WorkerCardSkeleton } from '../components/ui/Skeleton'
 
-const categories = [
-  { label: 'Drivers', value: 'drivers', icon: '🚚' },
-  { label: 'Electricians', value: 'electricians', icon: '💡' },
-  { label: 'Plumbers', value: 'plumbers', icon: '🛠️' },
-  { label: 'House Helpers', value: 'house helpers', icon: '🧹' },
-  { label: 'Labour', value: 'labour', icon: '👷' },
-  { label: 'Students', value: 'students', icon: '🎓' },
-  { label: 'Delivery Workers', value: 'delivery workers', icon: '📦' },
-  { label: 'Farmers', value: 'farmers', icon: '🌾' },
+const jobCategories = [
+  { label: 'Driver', labelHi: 'चालक', value: 'Driver', icon: Truck, color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+  { label: 'Electrician', labelHi: 'बिजली मिस्त्री', value: 'Electrician', icon: Zap, color: 'from-amber-500 to-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+  { label: 'Plumber', labelHi: 'प्लंबर', value: 'Plumber', icon: Wrench, color: 'from-cyan-500 to-cyan-600', bg: 'bg-cyan-50 dark:bg-cyan-900/20' },
+  { label: 'Carpenter', labelHi: 'बढ़ई', value: 'Carpenter', icon: Hammer, color: 'from-orange-500 to-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20' },
+  { label: 'Painter', labelHi: 'पेंटर', value: 'Painter', icon: ({ className }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+    </svg>
+  ), color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+  { label: 'Mason', labelHi: 'मिस्त्री', value: 'Mason', icon: Building2, color: 'from-slate-500 to-slate-600', bg: 'bg-slate-50 dark:bg-slate-800' },
+  { label: 'Mechanic', labelHi: 'मैकेनिक', value: 'Mechanic', icon: Cog, color: 'from-red-500 to-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
+  { label: 'Teacher', labelHi: 'शिक्षक', value: 'Teacher', icon: GraduationCap, color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+  { label: 'Farm Labour', labelHi: 'खेत मजदूर', value: 'Farm Labour', icon: Sprout, color: 'from-green-500 to-green-600', bg: 'bg-green-50 dark:bg-green-900/20' },
+  { label: 'Tailor', labelHi: 'दर्जी', value: 'Tailor', icon: Shirt, color: 'from-pink-500 to-pink-600', bg: 'bg-pink-50 dark:bg-pink-900/20' },
+  { label: 'Computer Operator', labelHi: 'कंप्यूटर ऑपरेटर', value: 'Computer Operator', icon: Monitor, color: 'from-teal-500 to-teal-600', bg: 'bg-teal-50 dark:bg-teal-900/20' },
+  { label: 'House Worker', labelHi: 'घर कामगार', value: 'House Worker', icon: Home, color: 'from-rose-500 to-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+  { label: 'Delivery Boy', labelHi: 'डिलीवरी बॉय', value: 'Delivery Boy', icon: Truck, color: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
 ]
 
-const workerImages = [
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=800&q=80',
+const jobTypes = [
+  { label: 'Government Jobs', labelHi: 'सरकारी नौकरी', value: 'government', icon: ShieldCheck, color: 'from-blue-600 to-blue-700' },
+  { label: 'Private Jobs', labelHi: 'प्राइवेट नौकरी', value: 'private', icon: Building2, color: 'from-brand-500 to-brand-600' },
+  { label: 'Agriculture Jobs', labelHi: 'कृषि नौकरी', value: 'agriculture', icon: Sprout, color: 'from-green-500 to-green-600' },
+  { label: 'Daily Wage Jobs', labelHi: 'दैनिक मजदूरी', value: 'daily_wage', icon: Clock, color: 'from-amber-500 to-amber-600' },
+  { label: 'Construction Jobs', labelHi: 'निर्माण कार्य', value: 'construction', icon: Hammer, color: 'from-orange-500 to-orange-600' },
 ]
-
-const heroBackground = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1600&q=80'
 
 const HomePage = () => {
   const { user } = useAuth()
-  const { isHindi, t } = useLanguage()
+  const { t, isHindi } = useLanguage()
+  const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
   const [workers, setWorkers] = useState([])
-  const [activeCategory, setActiveCategory] = useState('all')
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [loadError, setLoadError] = useState('')
-  const [dashboardStats, setDashboardStats] = useState(null)
+  const [locationQuery, setLocationQuery] = useState('')
+  const [activeCategory, setActiveCategory] = useState('all')
 
-  const ui = {
-    // heroBadge: t('home.heroBadge'),
-    heroTitle: t('home.heroTitle'),
-    // heroText: t('home.heroText'),
-    joinRozWork: t('home.joinRozWork'),
-    findWork: t('home.findWork'),
-    hireWorkers: t('home.hireWorkers'),
-    adminPanel: t('home.adminPanel'),
-    searchTitle: t('home.searchTitle'),
-    searchPlaceholder: t('home.searchPlaceholder'),
-    categoriesTitle: t('home.categoriesTitle'),
-    categoriesSubtitle: t('home.categoriesSubtitle'),
-    allCategories: t('home.allCategories'),
-    featuredJobs: t('home.featuredJobs'),
-    openOpportunities: t('home.openOpportunities'),
-    viewAll: t('home.viewAll'),
-    topWorkers: t('home.topWorkers'),
-    nearbyProfessionals: t('home.nearbyProfessionals'),
-    noJobs: t('home.noJobs'),
-    postWork: t('home.postWork'),
-    browseOpportunities: t('home.browseOpportunities'),
-    seeMoreWork: t('home.seeMoreWork'),
-  }
+  useEffect(() => {
+    fetchData()
+  }, [])
 
-  const load = async () => {
+  const fetchData = async () => {
+    setLoading(true)
     try {
-      setLoadError('')
       const [jobsRes, workersRes] = await Promise.all([
-        apiClient.get('/jobs'),
-        apiClient.get('/workers'),
+        client.get('/jobs').catch(() => ({ data: { jobs: [] } })),
+        client.get('/workers').catch(() => ({ data: { workers: [] } })),
       ])
       setJobs(jobsRes.data.jobs || [])
       setWorkers(workersRes.data.workers || [])
-      setDashboardStats({
-        workers: workersRes.data.workers?.length || 0,
-        totalJobs: jobsRes.data.jobs?.length || 0,
-        employers: 0,
-      })
-    } catch (error) {
-      console.error(error)
-      setLoadError('We could not load the latest jobs and workers right now. Please try again soon.')
+    } catch {
       setJobs([])
       setWorkers([])
-      setDashboardStats(null)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleGoalSelect = (selectedCategory) => {
-    setActiveCategory(selectedCategory)
-    setTimeout(() => {
-      document.getElementById('featured-jobs-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 120)
+  const handleSearch = (e) => {
+    e.preventDefault()
+    navigate(`/jobs?q=${encodeURIComponent(searchQuery)}&location=${encodeURIComponent(locationQuery)}&category=${activeCategory}`)
   }
 
-  useEffect(() => {
-    load()
-  }, [])
-
-  const getWorkerImage = (worker, index) => {
-    const categoryKey = normalize(worker.category || worker.profession || '')
-    const categoryImages = {
-      farmer: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=800&q=80',
-      driver: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-      electrician: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=800&q=80',
-      plumber: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80',
-      labour: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=800&q=80',
-    }
-
-    if (categoryImages[categoryKey]) {
-      return categoryImages[categoryKey]
-    }
-
-    return worker.photo || worker.image || workerImages[index % workerImages.length]
-  }
-
-  const normalize = (value = '') => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ')
-
-  const categoryMatches = (jobCategory, selectedCategory) => {
-    if (selectedCategory === 'all') return true
-    const normalizedJobCategory = normalize(jobCategory)
-    const normalizedSelectedCategory = normalize(selectedCategory)
-
-    const aliases = {
-      drivers: ['drivers', 'driver', 'delivery', 'transport'],
-      electricians: ['electricians', 'electrical', 'electrician', 'wiring'],
-      plumbers: ['plumbers', 'plumbing', 'repair'],
-      'house helpers': ['house helpers', 'house helper', 'home helper', 'cleaning', 'housekeeping', 'care assistant'],
-      labour: ['labour', 'labor', 'factory', 'warehouse', 'support'],
-      students: ['students', 'student', 'internship', 'internships'],
-      'delivery workers': ['delivery workers', 'delivery worker', 'delivery'],
-      farmers: ['farmers', 'farmer', 'farm', 'agriculture'],
-    }
-
-    return (aliases[normalizedSelectedCategory] || [normalizedSelectedCategory]).some((alias) => normalizedJobCategory.includes(alias))
-  }
-
-  const matchesSearch = (value = '') => {
-    const query = normalize(searchQuery)
-    if (!query) return true
-    return normalize(value).includes(query)
-  }
-
-  const filteredJobs = jobs.filter((job) => categoryMatches(job.category, activeCategory) && matchesSearch(`${job.title} ${job.category} ${job.location} ${job.description}`))
-  const filteredWorkers = workers.filter((worker) => matchesSearch(`${worker.name} ${worker.profession} ${worker.location} ${worker.skills?.join(' ') || ''} ${worker.bio || ''}`))
-
-  const liveStats = [
-    dashboardStats?.workers ? { label: 'Verified workers', value: `${dashboardStats.workers}` } : null,
-    dashboardStats?.totalJobs ? { label: 'Open jobs', value: `${dashboardStats.totalJobs}` } : null,
-    { label: 'Active categories', value: `${categories.length}` },
-  ].filter(Boolean)
+  const filteredJobs = jobs.filter((job) => {
+    if (activeCategory !== 'all' && job.category?.toLowerCase() !== activeCategory.toLowerCase()) return false
+    if (searchQuery && !`${job.title} ${job.category} ${job.description}`.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    return true
+  })
 
   return (
     <main className="pb-24 md:pb-0">
-      <section className="relative overflow-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `linear-gradient(90deg, rgba(2, 6, 23, 0.84) 0%, rgba(2, 6, 23, 0.6) 45%, rgba(2, 6, 23, 0.78) 100%), url(${heroBackground})` }}
-        />
-        <div className="relative mx-auto max-w-7xl rounded-[32px] border border-white/20 bg-white/10 p-4 shadow-2xl backdrop-blur-xl sm:p-6 lg:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
-            <div className="max-w-2xl text-white">
-              {/* <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-blue-100">
-                <Sparkles size={16} /> {ui.heroBadge}
-              </div> */}
-              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl lg:text-5xl">{ui.heroTitle}</h1>
-              <p className="mt-4 max-w-xl text-base text-blue-50 sm:text-lg">{ui.heroText}</p>
-              <div className="mt-6 flex flex-wrap gap-2 sm:gap-3">
-                <Link to="/login" className="rounded-full bg-white px-4 py-2.5 font-semibold text-blue-700 transition hover:translate-y-[-1px] sm:px-5 sm:py-3">{ui.joinRozWork}</Link>
-                <Link to="/jobs" className="rounded-full border border-white/30 px-4 py-2.5 font-semibold text-white transition hover:bg-white/10 sm:px-5 sm:py-3">{ui.findWork}</Link>
-                <Link to="/workers" className="rounded-full border border-white/30 px-4 py-2.5 font-semibold text-white transition hover:bg-white/10 sm:px-5 sm:py-3">{ui.hireWorkers}</Link>
-                {user?.role === 'super_admin' ? <Link to="/admin" className="rounded-full border border-white/30 px-4 py-2.5 font-semibold text-white transition hover:bg-white/10 sm:px-5 sm:py-3">{ui.adminPanel}</Link> : null}
-              </div>
-              {liveStats.length ? (
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {liveStats.map((item) => (
-                    <div key={item.label} className="rounded-2xl border border-white/15 bg-slate-900/40 px-3 py-3 backdrop-blur">
-                      <p className="text-xl font-semibold">{item.value}</p>
-                      <p className="mt-1 text-sm text-blue-100">{item.label}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="absolute inset-0 bg-mesh-dark opacity-50" />
+        <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-brand-500/10 blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-accent-500/10 blur-3xl" />
 
-            <div className="rounded-[24px] border border-white/20 bg-slate-950/70 p-4 text-white shadow-lg backdrop-blur sm:p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-blue-100">
-                <Search size={16} /> {ui.searchTitle}
-              </div>
-              <div className="mt-3 space-y-3">
-                <input
-                  className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-slate-300 focus:outline-none"
-                  placeholder={ui.searchPlaceholder}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                />
-                <select
-                  className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white focus:outline-none"
-                  value={activeCategory}
-                  onChange={(event) => setActiveCategory(event.target.value)}
+        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
+          <div className="text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <span className="inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-4 py-1.5 text-sm font-medium text-brand-400">
+                <Sparkle /> {isHindi ? 'हर गाँव में रोजगार' : 'Employment in Every Village'}
+              </span>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mx-auto mt-6 max-w-4xl text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl"
+            >
+              {isHindi ? (
+                <span>{'हर गाँव के लोगों को '}<span className="text-gradient">{'रोजगार'}</span>{' और काम से '}<span className="text-gradient">{'जोड़ने'}</span>{' वाला प्लेटफ़ॉर्म'}</span>
+              ) : (
+                <span>{'Connecting Every Village to '}<span className="text-gradient">{'Jobs'}</span>{' and '}<span className="text-gradient">{'Opportunities'}</span></span>
+              )}
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mx-auto mt-5 max-w-2xl text-base text-slate-400 sm:text-lg"
+            >
+              {isHindi
+                ? 'RozWork पर आसानी से काम खोजें और सही Worker ढूँढें। गाँव से लेकर शहर तक।'
+                : 'Find work easily and hire the right workers on RozWork. From villages to cities.'}
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="mt-8 flex flex-wrap items-center justify-center gap-4"
+            >
+              {!user ? (
+                <>
+                  <Link to="/register" className="btn-brand text-base px-8 py-3.5">
+                    {isHindi ? 'अभी शुरू करें' : 'Get Started Free'}
+                  </Link>
+                  <Link to="/jobs" className="btn-outline !border-slate-600 !text-slate-300 hover:!bg-slate-800 hover:!text-white text-base px-8 py-3.5">
+                    {isHindi ? 'नौकरी देखें' : 'Browse Jobs'}
+                  </Link>
+                </>
+              ) : (
+                <Link to="/dashboard" className="btn-brand text-base px-8 py-3.5">
+                  {isHindi ? 'डैशबोर्ड खोलें' : 'Open Dashboard'}
+                </Link>
+              )}
+            </motion.div>
+
+            {/* Stats */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="mt-12 grid grid-cols-3 gap-4 sm:gap-6 max-w-lg mx-auto"
+            >
+              {[
+                { value: `${workers.length || '50'}+`, label: isHindi ? 'Workers' : 'Workers' },
+                { value: `${jobs.length || '100'}+`, label: isHindi ? 'Jobs' : 'Jobs Posted' },
+                { value: `${jobCategories.length}+`, label: isHindi ? 'Categories' : 'Categories' },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+                  <p className="text-2xl font-bold text-white sm:text-3xl">{stat.value}</p>
+                  <p className="mt-1 text-xs text-slate-400 sm:text-sm">{stat.label}</p>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+
+          {/* Search Bar */}
+          <motion.form
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            onSubmit={handleSearch}
+            className="mx-auto mt-12 max-w-3xl"
+          >
+            <div className="glass-card !bg-white/95 dark:!bg-slate-900/95 p-2 sm:p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex flex-1 items-center gap-3 px-3">
+                  <Search className="h-5 w-5 text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={isHindi ? 'क्या काम चाहिए? (जैसे: Electrician, Driver)' : 'What work do you need? (e.g. Electrician, Driver)'}
+                    className="w-full bg-transparent py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100"
+                  />
+                </div>
+                <div className="hidden sm:block h-8 w-px bg-slate-200 dark:bg-slate-700" />
+                <div className="flex flex-1 items-center gap-3 px-3">
+                  <MapPin className="h-5 w-5 text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={locationQuery}
+                    onChange={(e) => setLocationQuery(e.target.value)}
+                    placeholder={isHindi ? 'कहाँ? (गाँव/शहर/जिला)' : 'Where? (Village/City/District)'}
+                    className="w-full bg-transparent py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="btn-brand !py-3.5 sm:px-8"
                 >
-                  <option value="all" className="text-slate-900">All categories</option>
-                  <option value="drivers" className="text-slate-900">Drivers</option>
-                  <option value="electricians" className="text-slate-900">Electricians</option>
-                  <option value="plumbers" className="text-slate-900">Plumbers</option>
-                  <option value="house helpers" className="text-slate-900">House Helpers</option>
-                  <option value="labour" className="text-slate-900">Labour</option>
-                  <option value="students" className="text-slate-900">Students</option>
-                  <option value="delivery workers" className="text-slate-900">Delivery Workers</option>
-                  <option value="farmers" className="text-slate-900">Farmers</option>
-                </select>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => document.getElementById('featured-jobs-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white">
-                    Search now
-                  </button>
-                  <button type="button" onClick={() => setActiveCategory('all')} className="rounded-2xl border border-white/20 px-4 py-3 text-sm font-semibold text-white">
-                    All jobs
-                  </button>
-                </div>
-              </div>
-              <div className="mt-4 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-3 text-sm text-blue-100">
-                <div className="flex items-center gap-2 font-semibold">
-                  <Briefcase size={16} /> Fast access to live opportunities
-                </div>
-                <p className="mt-1 text-blue-50/90">Browse verified jobs and nearby workers without leaving the homepage.</p>
+                  <Search className="h-4 w-4" />
+                  {isHindi ? 'खोजें' : 'Search'}
+                </button>
               </div>
             </div>
-          </div>
+          </motion.form>
         </div>
       </section>
 
-      {loadError ? <div className="mx-auto mb-4 max-w-7xl px-4 sm:px-6 lg:px-8"><div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">{loadError}</div></div> : null}
-
-      <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">{ui.categoriesTitle}</p>
-            <h2 className="text-2xl font-semibold text-slate-900">{ui.categoriesSubtitle}</h2>
-          </div>
-          <Link to="/jobs" className="text-sm font-semibold text-blue-600">{ui.viewAll}</Link>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {categories.map((category) => (
-            <button
-              key={category.value}
-              type="button"
-              onClick={() => handleGoalSelect(category.value)}
-              className={`rounded-2xl border p-4 text-left shadow-sm transition ${activeCategory === category.value ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}
+      {/* Job Type Quick Links */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+          {jobTypes.map((type) => (
+            <Link
+              key={type.value}
+              to={`/jobs?type=${type.value}`}
+              className="flex shrink-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
             >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-2xl">{category.icon}</span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">{ui.viewAll}</span>
-              </div>
-              <p className="mt-3 font-semibold text-slate-900">{category.label}</p>
-            </button>
+              <type.icon className="h-4 w-4 text-brand-500" />
+              {isHindi ? type.labelHi : type.label}
+            </Link>
           ))}
         </div>
       </section>
 
-      <section id="featured-jobs-section" className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">{ui.featuredJobs}</p>
-                <h2 className="text-2xl font-semibold text-slate-900">{ui.openOpportunities}</h2>
-              </div>
-              <Link to="/jobs" className="text-sm font-semibold text-blue-600">{ui.viewAll}</Link>
-            </div>
-            <div className="mt-6 space-y-3">
-              {filteredJobs.length > 0 ? filteredJobs.slice(0, 4).map((job) => (
-                <div key={job.id || job._id} className="rounded-2xl border border-slate-200 p-4 transition hover:border-blue-300 hover:shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-slate-900">{job.title}</p>
-                      <p className="mt-1 text-sm text-slate-500">{job.location} • {job.category}</p>
-                    </div>
-                    <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700">{job.salary}</span>
-                  </div>
-                </div>
-              )) : <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">{jobs.length === 0 ? 'No jobs are live yet. New openings will appear here as employers publish them.' : 'No jobs match this category yet. Try another filter or come back soon for fresh listings.'}</p>}
-            </div>
-          </motion.div>
+      {/* Categories Grid */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {isHindi ? 'काम की श्रेणियाँ' : 'Job Categories'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {isHindi ? 'अपनी ज़रूरत के अनुसार श्रेणी चुनें' : 'Choose a category that matches your needs'}
+            </p>
+          </div>
+          <Link to="/jobs" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:text-brand-600 transition-colors">
+            {isHindi ? 'सभी देखें' : 'View All'} <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
 
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">{ui.topWorkers}</p>
-                <h2 className="text-2xl font-semibold text-slate-900">{ui.nearbyProfessionals}</h2>
+        <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-6">
+          {jobCategories.map((cat) => (
+            <motion.button
+              key={cat.value}
+              whileHover={{ y: -4 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => navigate(`/jobs?category=${cat.value}`)}
+              className={`group flex flex-col items-center gap-2.5 rounded-2xl border p-4 text-center transition-all ${
+                activeCategory === cat.value
+                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 shadow-brand'
+                  : 'border-slate-100 bg-white hover:border-brand-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-800'
+              }`}
+            >
+              <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${cat.color} text-white shadow-lg`}>
+                <cat.icon className="h-6 w-6" />
               </div>
-              <Link to="/workers" className="text-sm font-semibold text-blue-600">{ui.viewAll}</Link>
-            </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {filteredWorkers.length > 0 ? filteredWorkers.slice(0, 4).map((worker, index) => (
-                <div key={worker.id || worker.name} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="flex items-center gap-3">
-                    <img src={getWorkerImage(worker, index)} alt={worker.name} className="h-12 w-12 rounded-full object-cover" />
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-900">{worker.name}</p>
-                      <p className="truncate text-sm text-slate-500">{worker.profession || worker.skills?.join(', ') || 'Skilled professional'}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
-                    <span className="flex items-center gap-1 text-amber-500"><BadgeCheck size={14} />{worker.ratings || '4.9'}</span>
-                    <span>₹{worker.price || 500}/day</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                    <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700">{worker.category || worker.profession || 'General'}</span>
-                    <span>{worker.completedJobs || 0} jobs</span>
-                  </div>
-                </div>
-              )) : <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500 sm:col-span-2">No workers are available in this category yet. Fresh verified profiles will appear here soon.</p>}
-            </div>
-          </motion.div>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-tight">
+                {isHindi ? cat.labelHi : cat.label}
+              </span>
+            </motion.button>
+          ))}
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">Recent jobs</p>
-              <h2 className="text-2xl font-semibold text-slate-900">Fresh opportunities from the marketplace</h2>
-            </div>
-            <Link to="/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
-              {ui.seeMoreWork} <ArrowRight size={16} />
-            </Link>
-          </div>
-          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {jobs.length > 0 ? jobs.slice(0, 6).map((job) => (
-              <div key={job.id || job._id} className="rounded-2xl border border-slate-200 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-700">{job.category}</span>
-                  <span className="text-sm font-semibold text-green-700">{job.salary}</span>
-                </div>
-                <h3 className="mt-3 font-semibold text-slate-900">{job.title}</h3>
-                <p className="mt-2 text-sm text-slate-500">{job.description}</p>
-                <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-                  <span>{job.location}</span>
-                  <span>Open now</span>
-                </div>
+      {/* Featured Jobs & Trending Workers */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+          {/* Featured Jobs */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {isHindi ? 'नवीनतम नौकरियाँ' : 'Latest Jobs'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {isHindi ? 'ताज़ा अवसर जो अभी उपलब्ध हैं' : 'Fresh opportunities available now'}
+                </p>
               </div>
-            )) : <p className="text-sm text-slate-500 md:col-span-2 xl:col-span-3">No jobs available</p>}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-4 pb-6 sm:px-6 sm:pb-8 lg:px-8 lg:pb-10">
-        <div className="rounded-[28px] border border-slate-200 bg-slate-950 p-6 text-white shadow-sm sm:p-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-300">User dashboard access</p>
-              <h2 className="text-2xl font-semibold">Stay connected to your profile, bookings, and work requests</h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-300">Open your dashboard to manage work, track bookings, and keep everything in one place.</p>
+              <Link to="/jobs" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:text-brand-600">
+                {isHindi ? 'सभी देखें' : 'View All'} <ChevronRight className="h-4 w-4" />
+              </Link>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {user ? (
-                <Link to="/dashboard" className="rounded-full bg-white px-5 py-3 font-semibold text-slate-900">Open dashboard</Link>
-              ) : (
+
+            <div className="mt-5 space-y-3">
+              {loading ? (
                 <>
-                  <Link to="/login" className="rounded-full bg-white px-5 py-3 font-semibold text-slate-900">Login</Link>
-                  <Link to="/register" className="rounded-full border border-white/20 px-5 py-3 font-semibold text-white">Register</Link>
+                  <JobCardSkeleton />
+                  <JobCardSkeleton />
+                  <JobCardSkeleton />
                 </>
+              ) : filteredJobs.length > 0 ? (
+                filteredJobs.slice(0, 5).map((job, index) => (
+                  <motion.div
+                    key={job._id || job.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <Link
+                      to={`/jobs/${job._id || job.id}`}
+                      className="block rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-800"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/20">
+                          <Briefcase className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">{job.title}</h3>
+                            {job.salary && (
+                              <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                                {job.salary}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            {job.location && (
+                              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
+                            )}
+                            {job.category && (
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">{job.category}</span>
+                            )}
+                            {job.workType && (
+                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{job.workType}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-800/50">
+                  <Briefcase className="mx-auto h-10 w-10 text-slate-300" />
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    {isHindi ? 'अभी कोई Job उपलब्ध नहीं है। जल्द ही नई Jobs आएँगी।' : 'No jobs available right now. New listings coming soon.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Trending Workers */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {isHindi ? 'ट्रेंडिंग वर्कर्स' : 'Trending Workers'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {isHindi ? 'आपके नज़दीक बेहतरीन पेशेवर' : 'Top professionals near you'}
+                </p>
+              </div>
+              <Link to="/workers" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:text-brand-600">
+                {isHindi ? 'सभी देखें' : 'View All'} <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {loading ? (
+                <>
+                  <WorkerCardSkeleton />
+                  <WorkerCardSkeleton />
+                </>
+              ) : workers.length > 0 ? (
+                workers.slice(0, 6).map((worker, index) => (
+                  <motion.div
+                    key={worker._id || worker.id || index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <Link
+                      to={`/workers/${worker._id || worker.id}`}
+                      className="block rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-800"
+                    >
+                      <div className="flex items-center gap-3">
+                        {worker.photo ? (
+                          <img src={worker.photo} alt={worker.name} className="h-12 w-12 rounded-full object-cover ring-2 ring-brand-100 dark:ring-brand-900" />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white font-bold">
+                            {worker.name?.[0]}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">{worker.name}</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+                            {worker.profession || worker.category || 'Professional'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-amber-600">
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span className="font-semibold">{typeof worker.ratings === 'number' ? worker.ratings.toFixed(1) : '4.8'}</span>
+                        </div>
+                      </div>
+                      {worker.location && (
+                        <p className="mt-2.5 flex items-center gap-1 text-xs text-slate-400">
+                          <MapPin className="h-3 w-3" /> {worker.location}
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {(worker.skills || []).slice(0, 3).map((skill, i) => (
+                          <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="sm:col-span-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-800/50">
+                  <Users className="mx-auto h-10 w-10 text-slate-300" />
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    {isHindi ? 'अभी कोई Worker उपलब्ध नहीं है।' : 'No workers available right now.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Nearby Workers */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {isHindi ? 'नज़दीकी वर्कर्स' : 'Nearby Workers'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {isHindi ? 'आपके क्षेत्र में उपलब्ध वर्कर्स' : 'Workers available in your area'}
+            </p>
+          </div>
+          <Link to="/workers" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:text-brand-600">
+            {isHindi ? 'सभी देखें' : 'View All'} <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-5 flex gap-4 overflow-x-auto no-scrollbar pb-2">
+          {workers.slice(0, 8).map((worker, index) => (
+            <Link
+              key={index}
+              to={`/workers/${worker._id || worker.id}`}
+              className="flex shrink-0 w-48 flex-col items-center rounded-2xl border border-slate-100 bg-white p-4 text-center transition-all hover:-translate-y-1 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+            >
+              {worker.photo ? (
+                <img src={worker.photo} alt={worker.name} className="h-16 w-16 rounded-full object-cover ring-2 ring-brand-100" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white text-xl font-bold">
+                  {worker.name?.[0]}
+                </div>
+              )}
+              <h3 className="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">{worker.name}</h3>
+              <p className="text-xs text-slate-500 line-clamp-1">{worker.profession || 'Professional'}</p>
+              <div className="mt-2 flex items-center gap-1 text-xs text-amber-600">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span>{typeof worker.ratings === 'number' ? worker.ratings.toFixed(1) : '4.8'}</span>
+              </div>
+              <span className="mt-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
+                {worker.availability || 'Available'}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Recent Jobs */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {isHindi ? 'हाल की नौकरियाँ' : 'Recent Jobs'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {isHindi ? 'ताज़ा अवसर जो अभी उपलब्ध हैं' : 'Fresh opportunities from the marketplace'}
+            </p>
+          </div>
+          <Link to="/jobs" className="flex items-center gap-1 text-sm font-semibold text-brand-500 hover:text-brand-600">
+            {isHindi ? 'और देखें' : 'See More'} <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {jobs.slice(0, 6).map((job) => (
+            <Link
+              key={job._id || job.id}
+              to={`/jobs/${job._id || job.id}`}
+              className="rounded-2xl border border-slate-100 bg-white p-5 transition-all hover:-translate-y-1 hover:border-brand-200 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-800"
+            >
+              <div className="flex items-center justify-between">
+                <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-900/20 dark:text-brand-400">
+                  {job.category}
+                </span>
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  className="rounded-lg p-1.5 text-slate-300 hover:text-brand-500 transition-colors"
+                >
+                  <Bookmark className="h-4 w-4" />
+                </button>
+              </div>
+              <h3 className="mt-3 font-bold text-slate-900 dark:text-slate-100 line-clamp-2">{job.title}</h3>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                {job.description}
+              </p>
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <MapPin className="h-3 w-3" /> {job.location || 'India'}
+                </div>
+                {job.salary && (
+                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    {job.salary}
+                  </span>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-500 to-accent-600 p-8 sm:p-12">
+          <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-white/10" />
+          <div className="absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-white/10" />
+          <div className="relative text-center">
+            <h2 className="text-2xl font-bold text-white sm:text-3xl">
+              {isHindi ? 'अभी अपनी Journey शुरू करें' : 'Start Your Journey Today'}
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-white/80">
+              {isHindi
+                ? 'RozWork पर जुड़ें और रोज़गार या Worker खोजें। मुफ्त में शुरू करें!'
+                : 'Join RozWork and find jobs or workers. It\'s free to get started!'}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+              {!user ? (
+                <>
+                  <Link to="/register" className="rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-brand-600 shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl">
+                    {isHindi ? 'Register करें' : 'Register Free'}
+                  </Link>
+                  <Link to="/login" className="rounded-xl border-2 border-white/30 px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-white/10">
+                    {isHindi ? 'Login करें' : 'Login'}
+                  </Link>
+                </>
+              ) : (
+                <Link to="/dashboard" className="rounded-xl bg-white px-8 py-3.5 text-sm font-bold text-brand-600 shadow-lg">
+                  {isHindi ? 'Dashboard खोलें' : 'Open Dashboard'}
+                </Link>
               )}
             </div>
           </div>
@@ -367,5 +561,11 @@ const HomePage = () => {
     </main>
   )
 }
+
+const Sparkle = () => (
+  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+  </svg>
+)
 
 export default HomePage

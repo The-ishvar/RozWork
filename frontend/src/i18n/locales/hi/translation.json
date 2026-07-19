@@ -29,8 +29,11 @@
     "jobs": "जॉब्स",
     "workers": "वर्कर्स",
     "gallery": "गैलरी",
+    "chat": "चैट",
     "notifications": "सूचनाएँ",
-    "profile": "प्रोफाइल"
+    "profile": "प्रोफाइल",
+    "dashboard": "डैशबोर्ड",
+    "settings": "सेटिंग्स"
   },
   "home": {
     "heroTitle": "RozWork स्थानीय वर्कर्स को जॉब चाहने वालों से जोड़ता है.",

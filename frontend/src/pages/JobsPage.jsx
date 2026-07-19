@@ -1,263 +1,376 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Briefcase, MapPin, Sparkles } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import apiClient from '../api/client'
+import { motion } from 'framer-motion'
+import {
+  Briefcase, MapPin, Search, Filter, IndianRupee, Clock, GraduationCap,
+  ChevronDown, ChevronUp, X, Plus, ExternalLink, Loader2
+} from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import client from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useToast } from '../components/ui/Toast'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
+import { JobCardSkeleton } from '../components/ui/Skeleton'
+import { EmptyJobState } from '../components/ui/EmptyState'
 
-const serviceCategoryOptions = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Driver', 'Delivery Boy', 'Farmer', 'Labour', 'House Helper', 'Cleaner', 'Mechanic', 'AC Repair', 'Mobile Repair', 'Computer Repair', 'Tutor', 'Freelancer', 'Other']
-const workTypeOptions = ['Full Time', 'Part Time', 'Daily Wage', 'Contract', 'Temporary']
-
-const goalOptions = [
-  { id: 'all', labelKey: 'jobs.allWork' },
-  { id: 'quick-income', labelKey: 'jobs.quickIncome' },
-  { id: 'flexible-hours', labelKey: 'jobs.flexibleHours' },
-  { id: 'skill-growth', labelKey: 'jobs.skillGrowth' },
+const categories = [
+  'Driver', 'Electrician', 'Plumber', 'Carpenter', 'Painter', 'Mason',
+  'Mechanic', 'Teacher', 'Tailor', 'Computer Operator', 'Farm Labour',
+  'House Worker', 'Security Guard', 'Delivery Boy', 'Shop Helper',
 ]
 
-const getJobGoalTags = (job = {}) => {
-  const explicitTags = Array.isArray(job.goalTags) ? job.goalTags.map((tag) => String(tag).toLowerCase()) : []
-  if (explicitTags.length) return explicitTags
+const workTypes = ['Full Time', 'Part Time', 'Contract', 'Daily Wage', 'Temporary']
 
-  const haystack = `${job.title || ''} ${job.category || ''} ${job.description || ''}`.toLowerCase()
-  const matches = []
+const experienceLevels = ['Fresher', '1-2 Years', '3-5 Years', '5+ Years']
 
-  if (/(delivery|packing|warehouse|driver|helper|cleaning|labour|farm|support|load)/.test(haystack)) {
-    matches.push('quick-income')
-  }
-  if (/(student|intern|event|home|farm|support|assistant|flexible)/.test(haystack)) {
-    matches.push('flexible-hours')
-  }
-  if (/(plumbing|repair|electrical|wiring|research|internship|training|maintenance|technical|skill)/.test(haystack)) {
-    matches.push('skill-growth')
-  }
-
-  return matches
-}
-
-const matchesGoal = (job, selectedGoal) => {
-  if (selectedGoal === 'all') return true
-  return getJobGoalTags(job).includes(selectedGoal)
-}
+const educationLevels = ['No Requirement', '10th Pass', '12th Pass', 'Graduate', 'Post Graduate', 'Diploma']
 
 const JobsPage = () => {
   const { user, token } = useAuth()
-  const { t } = useLanguage()
+  const { t, isHindi } = useLanguage()
+  const toast = useToast()
   const navigate = useNavigate()
-  const canCreatePosts = ['employer', 'admin', 'super_admin'].includes(user?.role)
-  const [jobs, setJobs] = useState([])
-  const [selectedGoal, setSelectedGoal] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [formMessage, setFormMessage] = useState('')
-  const { register, handleSubmit, reset } = useForm({ defaultValues: { workType: 'Full Time', category: '' } })
+  const [searchParams] = useSearchParams()
 
-  const loadJobs = async () => {
-    const { data } = await apiClient.get('/jobs')
-    setJobs(data.jobs || [])
-  }
+  const [jobs, setJobs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showFilters, setShowFilters] = useState(false)
+  const [showPostForm, setShowPostForm] = useState(false)
+  const [posting, setPosting] = useState(false)
+
+  const [filters, setFilters] = useState({
+    search: searchParams.get('q') || '',
+    category: searchParams.get('category') || 'all',
+    workType: 'all',
+    experience: 'all',
+    education: 'all',
+    salaryMin: '',
+    salaryMax: '',
+    location: searchParams.get('location') || '',
+  })
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm()
+
+  const canCreatePosts = ['employer', 'admin', 'super_admin'].includes(user?.role)
 
   useEffect(() => {
-    loadJobs()
+    fetchJobs()
   }, [])
 
-  const onSubmit = async (values) => {
-    if (!canCreatePosts) {
-      setFormMessage('Only employers and admins can publish jobs.')
-      return
-    }
-
+  const fetchJobs = async () => {
+    setLoading(true)
     try {
-      await apiClient.post('/jobs', {
+      const { data } = await client.get('/jobs')
+      setJobs(data.jobs || [])
+    } catch {
+      setJobs([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const onSubmitJob = async (values) => {
+    if (!canCreatePosts) return
+    setPosting(true)
+    try {
+      await client.post('/jobs', {
         ...values,
         title: values.title?.trim(),
-        category: values.category?.trim() || values.title?.trim() || 'Other',
+        category: values.category || values.title?.trim() || 'Other',
         location: values.location?.trim(),
-        salary: values.salary?.trim() || values.price?.trim() || values.budget?.trim() || '',
-        price: Number(values.price || values.salary || values.budget || 0),
-        budget: values.budget?.trim() || values.price?.trim() || values.salary?.trim() || '',
-        jobDate: values.jobDate?.trim() || '',
-        duration: values.duration?.trim() || '',
+        salary: values.salary?.trim() || `₹${values.price}/day`,
+        price: Number(values.price || 0),
         description: values.description?.trim(),
         experienceRequired: values.experienceRequired?.trim(),
         contactNumber: values.contactNumber?.trim(),
-        workType: values.workType?.trim() || 'Full Time',
+        workType: values.workType || 'Full Time',
         postedByRole: user?.role || 'employer',
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
       })
-      setFormMessage('Job posted successfully.')
-      reset({ workType: 'Full Time', category: '' })
-      await loadJobs()
-    } catch (error) {
-      setFormMessage(error?.response?.data?.message || 'We could not publish this job right now.')
+      toast.success('Posted!', isHindi ? 'Job सफलतापूर्वक post हो गई' : 'Job posted successfully')
+      reset()
+      setShowPostForm(false)
+      fetchJobs()
+    } catch (err) {
+      toast.error('Error', err.response?.data?.message || 'Job post नहीं हो सकी')
+    } finally {
+      setPosting(false)
     }
   }
 
-  const handleGoalSelect = (goalId) => {
-    setSelectedGoal(goalId)
-    setTimeout(() => {
-      document.getElementById('goal-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 120)
-  }
-
-  const matchesSearch = (job) => {
-    if (!searchQuery.trim()) return true
-    const query = searchQuery.toLowerCase()
-    return [job.title, job.category, job.location, job.description].join(' ').toLowerCase().includes(query)
-  }
-
-  const applyToJob = async (job) => {
-    if (!user) {
-      navigate('/login')
-      return
-    }
-
+  const handleApply = async (job) => {
+    if (!user) { navigate('/login'); return }
     try {
-      await apiClient.post('/bookings', {
-        employerId: job.postedBy,
-        workerId: user.id,
-        jobId: job.id,
-        serviceTitle: job.title,
-        serviceProvider: job.category || 'General',
-        price: job.price || job.salary || 0,
-        category: job.category || 'General',
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      await apiClient.post(`/jobs/${job.id}/apply`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      navigate('/profile', { state: { successMessage: 'Application submitted successfully.' } })
-    } catch (error) {
-      setFormMessage('We could not submit your application right now.')
+      await client.post(`/jobs/${job._id || job.id}/apply`)
+      toast.success('Applied!', isHindi ? 'Application भेज दी गई' : 'Application submitted')
+    } catch (err) {
+      toast.error('Error', err.response?.data?.message || 'Apply नहीं हो सका')
     }
   }
 
-  const visibleJobs = jobs.filter((job) => matchesGoal(job, selectedGoal) && matchesSearch(job))
+  const updateFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const clearFilters = () => {
+    setFilters({
+      search: '', category: 'all', workType: 'all', experience: 'all',
+      education: 'all', salaryMin: '', salaryMax: '', location: '',
+    })
+  }
+
+  const activeFilterCount = Object.entries(filters).filter(([key, val]) => {
+    if (key === 'search' || key === 'salaryMin' || key === 'salaryMax' || key === 'location') return !!val
+    return val !== 'all'
+  }).length
+
+  const filteredJobs = jobs.filter((job) => {
+    if (filters.search) {
+      const q = filters.search.toLowerCase()
+      if (!`${job.title} ${job.category} ${job.description} ${job.location}`.toLowerCase().includes(q)) return false
+    }
+    if (filters.category !== 'all' && job.category?.toLowerCase() !== filters.category.toLowerCase()) return false
+    if (filters.workType !== 'all' && job.workType?.toLowerCase() !== filters.workType.toLowerCase()) return false
+    if (filters.location && !job.location?.toLowerCase().includes(filters.location.toLowerCase())) return false
+    if (filters.salaryMin) {
+      const salary = parseInt(String(job.price || job.salary || '0').replace(/[^0-9]/g, ''))
+      if (salary < Number(filters.salaryMin)) return false
+    }
+    return true
+  })
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">{t('jobs.title')}</p>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{t('jobs.heroTitle')}</h1>
-            <p className="mt-3 max-w-2xl text-sm text-slate-600">Standard applications and booking requests include a small platform fee. Premium members unlock fee-free applications and revenue-friendly access to more opportunities.</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {isHindi ? 'नौकरी खोजें' : 'Find Jobs'}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {filteredJobs.length} {isHindi ? 'नौकरियाँ उपलब्ध' : 'jobs available'}
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">{t('jobs.heroBadge')}</div>
-            {user?.isPremium ? <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">Premium active</div> : <div className="rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">Upgrade for fee-free applications</div>}
-          </div>
-        </div>
-      </div>
-
-      {user ? (
-        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('jobs.postJob')}</h2>
-            {canCreatePosts ? null : <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600">View only access</span>}
-          </div>
-          {canCreatePosts ? (
-            <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobTitle', 'Job Title')} {...register('title', { required: true })} />
-              <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('category', { required: true })}>
-                <option value="">{t('jobs.category', 'Select category')}</option>
-                {serviceCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-              </select>
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.location', 'Location')} {...register('location', { required: true })} />
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.price', 'Budget / Price')} {...register('price')} />
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.budget', 'Budget label')} {...register('budget')} />
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.jobDate', 'Preferred date')} type="date" {...register('jobDate')} />
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.duration', 'Duration')} {...register('duration')} />
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.experience', 'Experience required')} {...register('experienceRequired')} />
-              <input className="rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.contact', 'Contact number')} {...register('contactNumber')} />
-              <select className="rounded-xl border border-slate-200 px-4 py-3" {...register('workType')}>
-                {workTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-              <textarea className="md:col-span-2 rounded-xl border border-slate-200 px-4 py-3" placeholder={t('jobs.description', 'Description')} rows="4" {...register('description', { required: true })} />
-              <button className="md:col-span-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white">{t('jobs.publishJob', 'Publish job')}</button>
-              {formMessage ? <p className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{formMessage}</p> : null}
-            </form>
-          ) : (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Only employers and admins can publish jobs. Regular users can browse listings and apply for opportunities.
-            </div>
+          {canCreatePosts && (
+            <Button
+              onClick={() => setShowPostForm(!showPostForm)}
+              icon={showPostForm ? X : Plus}
+            >
+              {isHindi ? 'नई Job Post करें' : 'Post New Job'}
+            </Button>
           )}
         </div>
-      ) : null}
 
-      <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">{t('jobs.chooseGoal')}</p>
-            <h3 className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">{t('jobs.chooseGoalSubtitle')}</h3>
-          </div>
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {goalOptions.map((goal) => {
-            const isActive = goal.id === selectedGoal
-            return (
-              <button
-                key={goal.id}
-                type="button"
-                onClick={() => handleGoalSelect(goal.id)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${isActive ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-              >
-                {t(goal.labelKey)}
-              </button>
-            )
-          })}
-        </div>
-        <p className="mt-3 text-sm text-slate-500">{t('jobs.filtersHint')}</p>
-      </div>
-
-      <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="rounded-xl border border-slate-200 px-4 py-3"
-            placeholder={t('jobs.searchPlaceholder')}
-          />
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-            {visibleJobs.length} {t('jobs.matchingJobs')}
-          </div>
-        </div>
-      </div>
-
-      <div id="goal-results" className="mt-10 grid gap-6 lg:grid-cols-2">
-        {visibleJobs.map((job) => (
-          <div key={job.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-blue-600">
-                  <Briefcase size={16} /> {job.category}
+        {/* Post Job Form */}
+        {showPostForm && canCreatePosts && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-6"
+          >
+            <div className="card-standard p-6">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                {isHindi ? 'नई Job Post करें' : 'Post a New Job'}
+              </h2>
+              <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit(onSubmitJob)}>
+                <input className="input-field" placeholder={isHindi ? 'Job का शीर्षक *' : 'Job Title *'} {...register('title', { required: true })} />
+                <select className="input-field" {...register('category')}>
+                  <option value="">{isHindi ? 'श्रेणी चुनें' : 'Select category'}</option>
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input className="input-field" placeholder={isHindi ? 'स्थान' : 'Location'} {...register('location')} />
+                <input className="input-field" placeholder={isHindi ? 'वेतन (जैसे ₹500/day)' : 'Salary (e.g. ₹500/day)'} {...register('salary')} />
+                <select className="input-field" {...register('workType')}>
+                  {workTypes.map((wt) => <option key={wt} value={wt}>{wt}</option>)}
+                </select>
+                <input className="input-field" placeholder={isHindi ? 'संपर्क नंबर' : 'Contact Number'} {...register('contactNumber')} />
+                <input className="input-field" placeholder={isHindi ? 'अनुभव' : 'Experience Required'} {...register('experienceRequired')} />
+                <input className="input-field" placeholder={isHindi ? 'शिक्षा' : 'Education Required'} {...register('educationRequired')} />
+                <textarea className="input-field sm:col-span-2" placeholder={isHindi ? 'विवरण *' : 'Description *'} rows={3} {...register('description', { required: true })} />
+                <div className="sm:col-span-2 flex gap-3">
+                  <Button type="submit" loading={posting}>{isHindi ? 'Post करें' : 'Post Job'}</Button>
+                  <Button variant="ghost" onClick={() => setShowPostForm(false)} type="button">{isHindi ? 'रद्द करें' : 'Cancel'}</Button>
                 </div>
-                <h3 className="mt-2 text-xl font-semibold text-slate-900">{job.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{job.description}</p>
-              </div>
-              <div className="rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700">₹{job.price || job.salary || 0}</div>
+              </form>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {getJobGoalTags(job).map((tag) => {
-                const matchingOption = goalOptions.find((option) => option.id === tag)
-                return (
-                  <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
-                    {matchingOption?.label || tag}
-                  </span>
-                )
-              })}
+          </motion.div>
+        )}
+
+        {/* Search & Filters */}
+        <div className="mt-6 space-y-3">
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => updateFilter('search', e.target.value)}
+                placeholder={isHindi ? 'नौकरी खोजें...' : 'Search jobs...'}
+                className="input-field pl-10"
+              />
             </div>
-            <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-slate-500">
-              <span className="flex items-center gap-1"><MapPin size={16} /> {job.location}</span>
-              <span className="flex items-center gap-1"><Sparkles size={16} /> {job.category}</span>
-              {job.jobDate ? <span>{job.jobDate}</span> : null}
-              {job.duration ? <span>{job.duration}</span> : null}
-            </div>
-            <button onClick={() => applyToJob(job)} className="mt-6 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">{t('jobs.applyNow')}</button>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition-all ${
+                showFilters || activeFilterCount > 0
+                  ? 'border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-900/20'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+              }`}
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
-        ))}
+
+          {/* Expanded Filters */}
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card-standard p-4"
+            >
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {isHindi ? 'श्रेणी' : 'Category'}
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) => updateFilter('category', e.target.value)}
+                    className="input-field !py-2.5 text-sm"
+                  >
+                    <option value="all">{isHindi ? 'सभी श्रेणियाँ' : 'All Categories'}</option>
+                    {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {isHindi ? 'काम का प्रकार' : 'Work Type'}
+                  </label>
+                  <select
+                    value={filters.workType}
+                    onChange={(e) => updateFilter('workType', e.target.value)}
+                    className="input-field !py-2.5 text-sm"
+                  >
+                    <option value="all">{isHindi ? 'सभी प्रकार' : 'All Types'}</option>
+                    {workTypes.map((wt) => <option key={wt} value={wt}>{wt}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {isHindi ? 'अनुभव' : 'Experience'}
+                  </label>
+                  <select
+                    value={filters.experience}
+                    onChange={(e) => updateFilter('experience', e.target.value)}
+                    className="input-field !py-2.5 text-sm"
+                  >
+                    <option value="all">{isHindi ? 'कोई भी' : 'Any'}</option>
+                    {experienceLevels.map((el) => <option key={el} value={el}>{el}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {isHindi ? 'स्थान' : 'Location'}
+                  </label>
+                  <input
+                    value={filters.location}
+                    onChange={(e) => updateFilter('location', e.target.value)}
+                    placeholder={isHindi ? 'शहर/गाँव' : 'City/Village'}
+                    className="input-field !py-2.5 text-sm"
+                  />
+                </div>
+              </div>
+              {activeFilterCount > 0 && (
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-1 text-xs font-semibold text-brand-500 hover:text-brand-600"
+                  >
+                    <X className="h-3 w-3" /> Clear all filters
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+
+        {/* Jobs List */}
+        <div className="mt-6 space-y-4">
+          {loading ? (
+            <>
+              <JobCardSkeleton />
+              <JobCardSkeleton />
+              <JobCardSkeleton />
+            </>
+          ) : filteredJobs.length > 0 ? (
+            filteredJobs.map((job) => (
+              <motion.div
+                key={job._id || job.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="card-standard"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/20">
+                    <Briefcase className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <Link
+                          to={`/jobs/${job._id || job.id}`}
+                          className="text-lg font-bold text-slate-900 hover:text-brand-500 transition-colors dark:text-slate-100"
+                        >
+                          {job.title}
+                        </Link>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          {job.category && <Badge variant="brand" size="sm">{job.category}</Badge>}
+                          {job.workType && <Badge variant="accent" size="sm">{job.workType}</Badge>}
+                          {job.salary && <Badge variant="success" size="sm">{job.salary}</Badge>}
+                        </div>
+                      </div>
+                    </div>
+                    {job.description && (
+                      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{job.description}</p>
+                    )}
+                    <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                      {job.location && (
+                        <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{job.location}</span>
+                      )}
+                      {job.experienceRequired && (
+                        <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" />{job.experienceRequired}</span>
+                      )}
+                      {job.duration && (
+                        <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{job.duration}</span>
+                      )}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => handleApply(job)}>
+                        {isHindi ? 'Apply करें' : 'Apply Now'}
+                      </Button>
+                      <Link to={`/jobs/${job._id || job.id}`}>
+                        <Button variant="outline" size="sm" icon={ExternalLink}>
+                          {isHindi ? 'विवरण' : 'Details'}
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            <EmptyJobState onPost={canCreatePosts ? () => setShowPostForm(true) : undefined} />
+          )}
+        </div>
       </div>
     </div>
   )

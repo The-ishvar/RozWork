@@ -29,8 +29,11 @@
     "jobs": "Jobs",
     "workers": "Workers",
     "gallery": "Gallery",
+    "chat": "Chat",
     "notifications": "Notifications",
-    "profile": "Profile"
+    "profile": "Profile",
+    "dashboard": "Dashboard",
+    "settings": "Settings"
   },
   "home": {
     "heroTitle": "RozWork connects local workers with job seekers.",

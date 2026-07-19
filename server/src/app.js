@@ -12,6 +12,7 @@ import notificationRoutes from './routes/notificationRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
 import dashboardRoutes from './routes/dashboardRoutes.js'
 import galleryRoutes from './routes/galleryRoutes.js'
+import chatRoutes from './routes/chatRoutes.js'
 import User from './models/User.js'
 import Job from './models/Job.js'
 import Service from './models/Service.js'
@@ -158,6 +159,8 @@ app.use('/dashboard', dashboardRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/gallery', galleryRoutes)
 app.use('/api/gallery', galleryRoutes)
+app.use('/chat', chatRoutes)
+app.use('/api/chat', chatRoutes)
 
 let seedPromise = null
 

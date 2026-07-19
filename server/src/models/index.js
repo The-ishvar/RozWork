@@ -9,6 +9,7 @@ import Transaction from './Transaction.js'
 import LoginHistory from './LoginHistory.js'
 import UserActivity from './UserActivity.js'
 import Setting from './Setting.js'
+import { Conversation, Message, Subscription, Report } from './Chat.js'
 
-export { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity, Setting }
-export default { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity, Setting }
+export { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity, Setting, Conversation, Message, Subscription, Report }
+export default { User, Admin, Booking, Purchase, Notification, Service, Job, Transaction, LoginHistory, UserActivity, Setting, Conversation, Message, Subscription, Report }
