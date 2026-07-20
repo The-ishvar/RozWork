@@ -10,13 +10,25 @@ import UserActivity from '../models/UserActivity.js'
 import Payment from '../models/Payment.js'
 import Setting from '../models/Setting.js'
 import { getAuditLogs } from '../utils/audit.js'
+import { createNotification, notifyAdmins } from '../utils/notify.js'
 
 const defaultPlatformSettings = {
   siteName: 'RozWork',
   maintenanceMode: false,
-  platformCommission: 5,
+  employerCommission: 10,
+  workerCommission: 2,
   premiumPrice: 99,
   applicationFee: 20,
+  razorpayEnabled: true,
+  upiEnabled: true,
+  phonepeEnabled: true,
+  gpayEnabled: true,
+  paytmEnabled: true,
+  razorpayKeyId: '',
+  razorpayKeySecret: '',
+  minBookingAmount: 100,
+  maxBookingAmount: 1000000,
+  autoCancelDays: 7,
 }
 
 const loadPlatformSettings = async () => {
@@ -50,6 +62,10 @@ const serializeUser = (user) => ({
   isVerified: user.isVerified !== false,
   isSuspended: !!user.isSuspended,
   isBanned: !!user.isBanned,
+  earnings: user.earnings || 0,
+  totalSpent: user.totalSpent || 0,
+  walletBalance: user.walletBalance || 0,
+  totalCommissionPaid: user.totalCommissionPaid || 0,
   lastActiveAt: user.lastActiveAt,
   createdAt: user.createdAt,
 })
@@ -143,31 +159,57 @@ export const getStats = async (_req, res, next) => {
       Payment.find({ status: 'completed' }).sort({ createdAt: -1 }).lean(),
     ])
 
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
     const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const todayRevenue = payments.filter((payment) => payment.createdAt && new Date(payment.createdAt).toDateString() === new Date().toDateString()).reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const monthlyRevenue = payments.filter((payment) => payment.createdAt && new Date(payment.createdAt).getMonth() === new Date().getMonth() && new Date(payment.createdAt).getFullYear() === new Date().getFullYear()).reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const applicationFeeRevenue = payments.filter((payment) => payment.paymentType === 'application_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const bookingFeeRevenue = payments.filter((payment) => payment.paymentType === 'booking_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const premiumRevenue = payments.filter((payment) => payment.paymentType === 'premium_membership').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const todayPayments = payments.filter((p) => p.createdAt && new Date(p.createdAt) >= todayStart)
+    const todayRevenue = todayPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const monthlyPayments = payments.filter((p) => {
+      const d = new Date(p.createdAt)
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+    })
+    const monthlyRevenue = monthlyPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const applicationFeeRevenue = payments.filter((p) => p.paymentType === 'application_fee').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    const bookingFeeRevenue = payments.filter((p) => p.paymentType === 'booking_fee').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    const premiumRevenue = payments.filter((p) => p.paymentType === 'premium_membership').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+
+    const employerCommissionTotal = payments.reduce((sum, p) => sum + Number(p.employerCommission || 0), 0)
+    const workerCommissionTotal = payments.reduce((sum, p) => sum + Number(p.workerCommission || 0), 0)
+
+    const todayBookings = bookings.filter((b) => b.createdAt && new Date(b.createdAt) >= todayStart)
 
     const stats = {
       totalUsers: users.length,
-      totalWorkers: users.filter((user) => user.role === 'worker').length,
-      totalEmployers: users.filter((user) => user.role === 'employer').length,
+      totalWorkers: users.filter((u) => u.role === 'worker').length,
+      totalEmployers: users.filter((u) => u.role === 'employer').length,
       totalBookings: bookings.length,
+      todayBookings: todayBookings.length,
+      pendingBookings: bookings.filter((b) => b.status === 'pending').length,
+      completedBookings: bookings.filter((b) => b.status === 'completed').length,
+      cancelledBookings: bookings.filter((b) => b.status === 'cancelled').length,
       totalJobs: jobs.length,
       totalRevenue,
       todayRevenue,
       monthlyRevenue,
+      employerCommission: employerCommissionTotal,
+      workerCommission: workerCommissionTotal,
+      totalCommission: employerCommissionTotal + workerCommissionTotal,
       applicationFeeRevenue,
       bookingFeeRevenue,
       premiumRevenue,
       totalNotifications: notifications.length,
-      activeUsers: users.filter((user) => !user.isSuspended && !user.isBanned).length,
-      pendingJobs: jobs.filter((job) => job.status === 'pending').length,
-      completedBookings: bookings.filter((booking) => booking.status === 'completed').length,
+      activeUsers: users.filter((u) => !u.isSuspended && !u.isBanned).length,
+      pendingJobs: jobs.filter((j) => j.status === 'pending').length,
       totalTransactions: transactions.length,
-      premiumUsers: users.filter((user) => user.isPremium).length,
+      paymentSuccess: payments.filter((p) => p.status === 'completed').length,
+      paymentFailed: payments.filter((p) => p.status === 'failed').length,
+      refunds: payments.filter((p) => p.status === 'refunded').length,
+      premiumUsers: users.filter((u) => u.isPremium).length,
+      topWorkers: users.filter((u) => u.role === 'worker').sort((a, b) => Number(b.earnings || 0) - Number(a.earnings || 0)).slice(0, 5).map((u) => ({ name: u.name, earnings: Number(u.earnings || 0), id: u._id.toString() })),
+      topEmployers: users.filter((u) => u.role === 'employer').sort((a, b) => Number(b.totalSpent || 0) - Number(a.totalSpent || 0)).slice(0, 5).map((u) => ({ name: u.name, totalSpent: Number(u.totalSpent || 0), id: u._id.toString() })),
+      latestBookings: bookings.slice(0, 10).map((b) => ({ id: b._id.toString(), serviceTitle: b.serviceTitle, amount: b.amount, status: b.status, createdAt: b.createdAt })),
+      latestPayments: payments.slice(0, 10).map((p) => ({ id: p._id.toString(), amount: p.amount, paymentType: p.paymentType, status: p.status, createdAt: p.createdAt })),
     }
 
     return res.json({ stats })
@@ -189,22 +231,26 @@ export const getOverview = async (_req, res, next) => {
     ])
 
     const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const applicationFeeRevenue = payments.filter((payment) => payment.paymentType === 'application_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const bookingFeeRevenue = payments.filter((payment) => payment.paymentType === 'booking_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-    const premiumRevenue = payments.filter((payment) => payment.paymentType === 'premium_membership').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const employerCommissionTotal = payments.reduce((sum, p) => sum + Number(p.employerCommission || 0), 0)
+    const workerCommissionTotal = payments.reduce((sum, p) => sum + Number(p.workerCommission || 0), 0)
+    const applicationFeeRevenue = payments.filter((p) => p.paymentType === 'application_fee').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    const bookingFeeRevenue = payments.filter((p) => p.paymentType === 'booking_fee').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    const premiumRevenue = payments.filter((p) => p.paymentType === 'premium_membership').reduce((sum, p) => sum + Number(p.amount || 0), 0)
+
     const revenueByMonth = Array.from({ length: 6 }, (_, index) => {
       const month = new Date()
       month.setMonth(month.getMonth() - index)
       const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
-      const value = payments.filter((payment) => payment.createdAt && `${new Date(payment.createdAt).getFullYear()}-${String(new Date(payment.createdAt).getMonth() + 1).padStart(2, '0')}` === key).reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+      const value = payments.filter((p) => p.createdAt && `${new Date(p.createdAt).getFullYear()}-${String(new Date(p.createdAt).getMonth() + 1).padStart(2, '0')}` === key).reduce((sum, p) => sum + Number(p.amount || 0), 0)
       return { label: month.toLocaleString('default', { month: 'short' }), value }
     }).reverse()
-    const topEarningWorkers = users.filter((user) => user.role === 'worker').sort((left, right) => Number(right.earnings || 0) - Number(left.earnings || 0)).slice(0, 5).map((user) => ({ name: user.name, earnings: Number(user.earnings || 0), category: user.profession || 'Worker' }))
+
+    const topEarningWorkers = users.filter((u) => u.role === 'worker').sort((a, b) => Number(b.earnings || 0) - Number(a.earnings || 0)).slice(0, 5).map((u) => ({ name: u.name, earnings: Number(u.earnings || 0), category: u.profession || 'Worker' }))
 
     const stats = {
       totalUsers: users.length,
-      totalWorkers: users.filter((user) => user.role === 'worker').length,
-      totalEmployers: users.filter((user) => user.role === 'employer').length,
+      totalWorkers: users.filter((u) => u.role === 'worker').length,
+      totalEmployers: users.filter((u) => u.role === 'employer').length,
       totalBookings: bookings.length,
       totalJobs: jobs.length,
       totalRevenue,
@@ -212,7 +258,10 @@ export const getOverview = async (_req, res, next) => {
       applicationFeeRevenue,
       bookingFeeRevenue,
       premiumRevenue,
-      premiumUsers: users.filter((user) => user.isPremium).length,
+      premiumUsers: users.filter((u) => u.isPremium).length,
+      employerCommission: employerCommissionTotal,
+      workerCommission: workerCommissionTotal,
+      totalCommission: employerCommissionTotal + workerCommissionTotal,
     }
 
     return res.json({
@@ -220,14 +269,14 @@ export const getOverview = async (_req, res, next) => {
       users: users.map(serializeUser),
       jobs,
       notifications,
-      activities: notifications.slice(0, 6).map((notification) => ({
-        id: notification._id.toString(),
-        type: notification.type,
-        title: notification.title,
-        message: notification.message,
-        createdAt: notification.createdAt,
+      activities: notifications.slice(0, 6).map((n) => ({
+        id: n._id.toString(),
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        createdAt: n.createdAt,
       })),
-      pendingContent: jobs.filter((job) => job.status === 'pending').slice(0, 6),
+      pendingContent: jobs.filter((j) => j.status === 'pending').slice(0, 6),
       recentPurchases: purchases.slice(0, 6),
       auditLogs: getAuditLogs().slice(0, 10),
       revenueAnalytics: {
@@ -235,6 +284,9 @@ export const getOverview = async (_req, res, next) => {
         applicationFeeRevenue,
         bookingFeeRevenue,
         premiumRevenue,
+        employerCommission: employerCommissionTotal,
+        workerCommission: workerCommissionTotal,
+        totalCommission: employerCommissionTotal + workerCommissionTotal,
         revenueByMonth,
         topEarningWorkers,
       },
@@ -412,32 +464,221 @@ export const getNotifications = async (_req, res, next) => {
 
 export const getAuditHistory = async (_req, res) => res.json({ logs: getAuditLogs() })
 
-export const getBookingTracking = async (_req, res, next) => {
+export const getBookingTracking = async (req, res, next) => {
   try {
-    const bookings = await Booking.find().sort({ createdAt: -1 }).lean()
+    const { status, page = 1, limit = 50, search = '' } = req.query
+    const query = {}
+    if (status) query.status = status
+
+    const total = await Booking.countDocuments(query)
+    const bookings = await Booking.find(query).sort({ createdAt: -1 }).skip((Number(page) - 1) * Number(limit)).limit(Number(limit)).lean()
+
     const extended = await Promise.all(bookings.map(async (booking) => {
       const [employer, worker] = await Promise.all([
         User.findById(booking.employerId || booking.userId).lean(),
         User.findById(booking.workerId || booking.providerId).lean(),
       ])
-
       return {
         id: booking._id.toString(),
         employerName: employer?.name || 'Unknown',
+        employerId: employer?._id?.toString() || '',
         workerName: worker?.name || 'Unknown',
-        bookingDate: booking.createdAt,
-        amount: booking.amount || booking.price || 0,
-        status: booking.status,
-        verificationStatus: booking.verificationStatus || 'pending',
-        paymentStatus: booking.paymentStatus || 'pending',
-        completedAt: booking.completedAt || null,
+        workerId: worker?._id?.toString() || '',
+        serviceTitle: booking.serviceTitle || '',
         category: booking.category || 'General',
+        amount: booking.amount || booking.price || 0,
+        employerPays: booking.employerPays || 0,
+        workerReceives: booking.workerReceives || 0,
+        totalPlatformCommission: booking.totalPlatformCommission || 0,
+        employerCommissionAmount: booking.employerCommissionAmount || 0,
+        workerCommissionAmount: booking.workerCommissionAmount || 0,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus || 'pending',
+        paymentMethod: booking.paymentMethod || '',
+        verificationStatus: booking.verificationStatus || 'pending',
+        refundStatus: booking.refundStatus || 'none',
+        refundAmount: booking.refundAmount || 0,
+        completedAt: booking.completedAt || null,
+        createdAt: booking.createdAt,
+        address: booking.address || '',
+        village: booking.village || '',
+        bookingDate: booking.bookingDate || '',
+        bookingTime: booking.bookingTime || '',
       }
     }))
 
-    return res.json({ bookings: extended })
+    let filtered = extended
+    if (search) {
+      const q = search.toLowerCase()
+      filtered = extended.filter((b) =>
+        b.employerName.toLowerCase().includes(q) ||
+        b.workerName.toLowerCase().includes(q) ||
+        b.serviceTitle.toLowerCase().includes(q) ||
+        b.category.toLowerCase().includes(q)
+      )
+    }
+
+    return res.json({
+      bookings: filtered,
+      pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) },
+    })
   } catch (error) {
     console.error('admin.getBookingTracking failed', error)
+    next(error)
+  }
+}
+
+export const getAllPayments = async (req, res, next) => {
+  try {
+    const { status, type, page = 1, limit = 50 } = req.query
+    const query = {}
+    if (status) query.status = status
+    if (type) query.paymentType = type
+
+    const total = await Payment.countDocuments(query)
+    const payments = await Payment.find(query).sort({ createdAt: -1 }).skip((Number(page) - 1) * Number(limit)).limit(Number(limit)).lean()
+
+    const extended = await Promise.all(payments.map(async (payment) => {
+      const [employer, worker] = await Promise.all([
+        payment.employerId ? User.findById(payment.employerId).lean() : null,
+        payment.workerId ? User.findById(payment.workerId).lean() : null,
+      ])
+      return {
+        id: payment._id.toString(),
+        employerName: employer?.name || 'Unknown',
+        workerName: worker?.name || 'Unknown',
+        amount: payment.amount || 0,
+        totalAmount: payment.totalAmount || 0,
+        commissionAmount: payment.commissionAmount || 0,
+        employerCommission: payment.employerCommission || 0,
+        workerCommission: payment.workerCommission || 0,
+        workerAmount: payment.workerAmount || 0,
+        paymentType: payment.paymentType || 'other',
+        paymentMethod: payment.paymentMethod || '',
+        status: payment.status || 'completed',
+        transactionId: payment.transactionId || '',
+        refundStatus: payment.refundStatus || 'none',
+        refundAmount: payment.refundAmount || 0,
+        createdAt: payment.createdAt,
+        date: payment.date || payment.createdAt,
+      }
+    }))
+
+    return res.json({
+      payments: extended,
+      pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) },
+    })
+  } catch (error) {
+    console.error('admin.getAllPayments failed', error)
+    next(error)
+  }
+}
+
+export const approveRefund = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params
+    const { action } = req.body
+
+    const booking = await Booking.findById(bookingId)
+    if (!booking) return res.status(404).json({ message: 'Booking not found' })
+    if (booking.refundStatus !== 'pending') {
+      return res.status(400).json({ message: 'No pending refund for this booking.' })
+    }
+
+    booking.refundStatus = action === 'approve' ? 'approved' : 'rejected'
+    if (action === 'approve') {
+      booking.paymentStatus = 'refunded'
+      await booking.save()
+
+      const employer = await User.findById(booking.employerId || booking.userId)
+      if (employer) {
+        employer.totalSpent = Math.max(0, Number(employer.totalSpent || 0) - Number(booking.refundAmount || 0))
+        await employer.save()
+      }
+
+      await Payment.create({
+        userId: booking.employerId || booking.userId,
+        workerId: booking.workerId,
+        employerId: booking.employerId || booking.userId,
+        bookingId: booking._id,
+        amount: booking.refundAmount || 0,
+        paymentType: 'refund',
+        status: 'completed',
+        refundStatus: 'completed',
+        refundAmount: booking.refundAmount || 0,
+        refundDate: new Date(),
+        transactionId: `refund_${Date.now()}`,
+      })
+
+      await Transaction.create({
+        userId: booking.employerId || booking.userId,
+        type: 'refund',
+        amount: booking.refundAmount || 0,
+        currency: 'INR',
+        status: 'completed',
+        bookingId: booking._id,
+        description: `Refund for ${booking.serviceTitle}`,
+      })
+    } else {
+      booking.refundStatus = 'rejected'
+      await booking.save()
+    }
+
+    await createNotification({
+      userId: booking.employerId || booking.userId,
+      type: 'refund_' + (action === 'approve' ? 'approved' : 'rejected'),
+      title: action === 'approve' ? 'Refund Approved' : 'Refund Rejected',
+      message: action === 'approve'
+        ? `Your refund of ₹${booking.refundAmount} for ${booking.serviceTitle} has been approved and processed.`
+        : `Your refund request for ${booking.serviceTitle} has been rejected.`,
+      relatedId: booking._id,
+    })
+
+    return res.json({ message: `Refund ${action === 'approve' ? 'approved' : 'rejected'} successfully`, booking: { id: booking._id.toString(), refundStatus: booking.refundStatus } })
+  } catch (error) {
+    console.error('admin.approveRefund failed', error)
+    next(error)
+  }
+}
+
+export const exportData = async (req, res, next) => {
+  try {
+    const { type } = req.params
+    const { format = 'csv' } = req.query
+
+    let data = []
+    let headers = []
+
+    if (type === 'bookings') {
+      const bookings = await Booking.find().sort({ createdAt: -1 }).lean()
+      headers = ['ID', 'Service', 'Amount', 'Employer Pays', 'Worker Receives', 'Commission', 'Status', 'Payment Status', 'Created']
+      data = bookings.map((b) => [b._id.toString(), b.serviceTitle, b.amount, b.employerPays || 0, b.workerReceives || 0, b.totalPlatformCommission || 0, b.status, b.paymentStatus, new Date(b.createdAt).toISOString()])
+    } else if (type === 'payments') {
+      const payments = await Payment.find().sort({ createdAt: -1 }).lean()
+      headers = ['ID', 'Amount', 'Type', 'Method', 'Status', 'Commission', 'Worker Amount', 'Created']
+      data = payments.map((p) => [p._id.toString(), p.amount, p.paymentType, p.paymentMethod || '', p.status, p.commissionAmount || 0, p.workerAmount || 0, new Date(p.createdAt).toISOString()])
+    } else if (type === 'transactions') {
+      const transactions = await Transaction.find().sort({ createdAt: -1 }).lean()
+      headers = ['ID', 'Type', 'Amount', 'Status', 'Description', 'Created']
+      data = transactions.map((t) => [t._id.toString(), t.type, t.amount, t.status, t.description || '', new Date(t.createdAt).toISOString()])
+    } else if (type === 'users') {
+      const users = await User.find().sort({ createdAt: -1 }).lean()
+      headers = ['ID', 'Name', 'Email', 'Role', 'Earnings', 'Spent', 'Commission Paid', 'Created']
+      data = users.map((u) => [u._id.toString(), u.name, u.email, u.role, u.earnings || 0, u.totalSpent || 0, u.totalCommissionPaid || 0, new Date(u.createdAt).toISOString()])
+    } else {
+      return res.status(400).json({ message: 'Invalid export type. Use: bookings, payments, transactions, users' })
+    }
+
+    if (format === 'csv') {
+      const csv = [headers.join(','), ...data.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n')
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', `attachment; filename=rozwork-${type}.csv`)
+      return res.send(csv)
+    }
+
+    return res.json({ type, headers, data, total: data.length })
+  } catch (error) {
+    console.error('admin.exportData failed', error)
     next(error)
   }
 }
@@ -498,6 +739,9 @@ export default {
   getNotifications,
   getAuditHistory,
   getBookingTracking,
+  getAllPayments,
+  approveRefund,
+  exportData,
   submitModerationAction,
   bulkAction,
 }

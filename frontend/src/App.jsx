@@ -4,10 +4,10 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
-import { LanguageProvider, useLanguage } from './context/LanguageContext'
+import { LanguageProvider } from './context/LanguageContext'
 import { ToastProvider } from './components/ui/Toast'
 import { ChatProvider } from './context/ChatContext'
-import Skeleton from './components/ui/Skeleton'
+
 
 const HomePage = lazy(() => import('./pages/HomePage'))
 const AuthPage = lazy(() => import('./pages/AuthPage'))
@@ -24,6 +24,7 @@ const AdminPanelPage = lazy(() => import('./pages/AdminPanelPage'))
 const GalleryPage = lazy(() => import('./pages/GalleryPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const PaymentPage = lazy(() => import('./pages/PaymentPage'))
 
 const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -36,14 +37,12 @@ const PageLoader = () => (
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
-  const { t } = useLanguage()
   if (loading) return <PageLoader />
   return user ? children : <Navigate to="/login" replace />
 }
 
 const PublicRoute = ({ children }) => {
   const { user, loading, token } = useAuth()
-  const { t } = useLanguage()
   if (loading) return <PageLoader />
   if (token || user) {
     const destination = user?.role === 'admin' || user?.role === 'super_admin' ? '/admin' : '/dashboard'
@@ -88,6 +87,7 @@ const AppRoutes = () => {
               <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+              <Route path="/payment/:bookingId" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/admin" element={<AdminRoute><AdminPanelPage /></AdminRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />

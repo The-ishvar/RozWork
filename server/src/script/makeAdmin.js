@@ -26,17 +26,23 @@ const getBooleanArg = (name, defaultValue = false) => {
 }
 
 const role = getArg('role', 'super_admin')
-const name = getArg('name', role === 'super_admin' ? 'Super Admin' : 'Admin')
-const email = getArg('email', role === 'super_admin' ? 'superadmin@rozwork.com' : 'admin@rozwork.com')
-const phone = getArg('phone', role === 'super_admin' ? '9660585691' : '')
+const name = getArg('name', '')
+const email = getArg('email', '')
+const phone = getArg('phone', '')
 const username = getArg('username', '')
-const password = getArg('password', role === 'super_admin' ? '123456789' : '123456789')
+const password = getArg('password', '')
 const dryRun = getBooleanArg('dry-run')
 const debugVerify = getBooleanArg('debug-verify')
 
 const validRoles = ['admin', 'super_admin']
 if (!validRoles.includes(role)) {
   console.error(`Invalid --role "${role}". Use one of: ${validRoles.join(', ')}`)
+  process.exit(1)
+}
+
+if (!email || !password || !name) {
+  console.error('Missing required arguments. Usage:')
+  console.error('  node makeAdmin.js --name "Admin Name" --email admin@example.com --password <password> [--role admin|super_admin] [--phone <phone>]')
   process.exit(1)
 }
 

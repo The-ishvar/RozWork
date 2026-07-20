@@ -157,8 +157,8 @@ const HomePage = () => {
               className="mt-12 grid grid-cols-3 gap-4 sm:gap-6 max-w-lg mx-auto"
             >
               {[
-                { value: `${workers.length || '50'}+`, label: isHindi ? 'Workers' : 'Workers' },
-                { value: `${jobs.length || '100'}+`, label: isHindi ? 'Jobs' : 'Jobs Posted' },
+                { value: workers.length > 0 ? `${workers.length}+` : '0', label: isHindi ? 'Workers' : 'Workers' },
+                { value: jobs.length > 0 ? `${jobs.length}+` : '0', label: isHindi ? 'Jobs' : 'Jobs Posted' },
                 { value: `${jobCategories.length}+`, label: isHindi ? 'Categories' : 'Categories' },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">

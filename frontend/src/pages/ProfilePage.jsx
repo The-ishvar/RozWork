@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Briefcase, Camera, Edit3, Mail, MapPin, Phone, ShieldCheck, Sparkles, Wallet, X } from 'lucide-react'
+import { Briefcase, Camera, Edit3, ShieldCheck, Wallet, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import apiClient from '../api/client'
@@ -30,10 +30,10 @@ const ProfilePage = () => {
   const [myPosts, setMyPosts] = useState([])
   const [bookings, setBookings] = useState([])
   const [serviceCategories, setServiceCategories] = useState([])
-  const [skills, setSkills] = useState(['React', 'Tailwind CSS', 'Node.js'])
+  const [skills, setSkills] = useState([])
   const [experience, setExperience] = useState([{ company: '', position: '', startDate: '', endDate: '', description: '' }])
   const [education, setEducation] = useState([{ institution: '', degree: '', year: '' }])
-  const [achievements, setAchievements] = useState(['Top Rated Freelancer'])
+  const [achievements, setAchievements] = useState([])
   const [portfolio, setPortfolio] = useState({ github: '', linkedin: '', website: '' })
   const [notifications, setNotifications] = useState({ email: true, sms: true, app: true })
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -89,10 +89,10 @@ const ProfilePage = () => {
     })
     setPhotoPreview(user.photo || '')
     setServiceCategories(Array.isArray(user.serviceCategories) ? user.serviceCategories : [])
-    setSkills(Array.isArray(user.skills) && user.skills.length ? user.skills : skills)
+    setSkills(Array.isArray(user.skills) && user.skills.length ? user.skills : [])
     setExperience(Array.isArray(user.experience) && user.experience.length ? user.experience : [{ company: '', position: '', startDate: '', endDate: '', description: '' }])
     setEducation(Array.isArray(user.education) && user.education.length ? user.education : [{ institution: '', degree: '', year: '' }])
-    setAchievements(Array.isArray(user.certificates) && user.certificates.length ? user.certificates : achievements)
+    setAchievements(Array.isArray(user.certificates) && user.certificates.length ? user.certificates : [])
     setPortfolio({ github: user.portfolio?.[0] || '', linkedin: user.portfolio?.[1] || '', website: user.portfolio?.[2] || '' })
     setResumeDraft(user.resumeUrl || '')
   }, [user, token])
@@ -137,7 +137,7 @@ const ProfilePage = () => {
       setMessage('Profile updated successfully and ready for the next opportunity.')
       await loadDashboardData()
       setIsEditorOpen(false)
-    } catch (error) {
+    } catch {
       setMessage('The profile could not be saved right now.')
     } finally {
       setLoading(false)

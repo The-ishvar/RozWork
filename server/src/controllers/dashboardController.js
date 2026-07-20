@@ -3,6 +3,7 @@ import Job from '../models/Job.js'
 import Purchase from '../models/Purchase.js'
 import Notification from '../models/Notification.js'
 import Payment from '../models/Payment.js'
+import Transaction from '../models/Transaction.js'
 import User from '../models/User.js'
 
 const buildUserBookingQuery = (userId) => ({
@@ -13,13 +14,14 @@ export const getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user.id
     const role = req.user.role || 'user'
-    const [jobs, bookings, purchases, notifications, viewer, payments] = await Promise.all([
+    const [jobs, bookings, purchases, notifications, viewer, payments, transactions] = await Promise.all([
       Job.find({ postedBy: userId }).sort({ createdAt: -1 }).lean(),
       Booking.find(buildUserBookingQuery(userId)).sort({ createdAt: -1 }).lean(),
       Purchase.find({ userId }).sort({ createdAt: -1 }).lean(),
       Notification.find({ userId }).sort({ createdAt: -1 }).lean(),
       User.findById(userId).lean(),
       Payment.find({ $or: [{ workerId: userId }, { employerId: userId }] }).sort({ date: -1 }).lean(),
+      Transaction.find({ userId }).sort({ createdAt: -1 }).lean(),
     ])
 
     const completedBookings = bookings.filter((booking) => booking.status === 'completed')
@@ -28,13 +30,19 @@ export const getDashboardStats = async (req, res, next) => {
     const activeJobs = jobs.filter((job) => job.status === 'approved').length
     const pendingJobs = jobs.filter((job) => job.status === 'pending').length
     const completedJobs = jobs.filter((job) => job.status === 'completed').length
-    const spentAmount = completedBookings.reduce((sum, booking) => sum + Number(booking.amount || booking.price || 0), 0)
-    const totalEarnings = completedBookings.reduce((sum, booking) => sum + Number(booking.amount || booking.price || 0), 0)
+    const spentAmount = completedBookings.reduce((sum, booking) => sum + Number(booking.employerPays || booking.amount || booking.price || 0), 0)
+    const totalEarnings = completedBookings.reduce((sum, booking) => sum + Number(booking.workerReceives || booking.amount || booking.price || 0), 0)
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const todayBookings = bookings.filter((b) => b.createdAt && new Date(b.createdAt) >= todayStart)
 
     const stats = {
       totalJobsApplied: 0,
       totalJobsPosted: jobs.length,
       totalBookings: bookings.length,
+      todayBookings: todayBookings.length,
       totalReviews: 0,
       activeJobs,
       pendingJobs,
@@ -62,6 +70,9 @@ export const getDashboardStats = async (req, res, next) => {
       isPremium: !!viewer?.isPremium,
       premiumPlan: viewer?.premiumPlan || '',
       premiumExpiryDate: viewer?.premiumExpiryDate || null,
+      walletBalance: viewer?.walletBalance || 0,
+      walletPending: viewer?.walletPending || 0,
+      totalCommissionPaid: viewer?.totalCommissionPaid || 0,
       applicationFeeRevenue: completedPayments.filter((payment) => payment.paymentType === 'application_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
       bookingFeeRevenue: completedPayments.filter((payment) => payment.paymentType === 'booking_fee').reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
       premiumRevenue: completedPayments.filter((payment) => payment.paymentType === 'premium_membership').reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
@@ -106,15 +117,36 @@ export const getDashboardStats = async (req, res, next) => {
       stats.totalCompletedJobs = allBookings.filter((booking) => booking.status === 'completed').length
     }
 
-    const earningsHistory = payments.slice(0, 6).map((payment) => ({
+    const earningsHistory = payments.slice(0, 10).map((payment) => ({
       id: payment._id?.toString?.() || payment.id,
       amount: Number(payment.amount || 0),
+      commissionAmount: Number(payment.commissionAmount || 0),
+      workerAmount: Number(payment.workerAmount || 0),
+      paymentType: payment.paymentType || 'other',
       status: payment.status || 'pending',
       date: payment.date || payment.createdAt,
       bookingId: payment.bookingId?.toString?.() || payment.bookingId,
     }))
 
-    return res.json({ stats, recentJobs: jobs.slice(0, 5), recentBookings: bookings.slice(0, 5), recentPurchases: purchases.slice(0, 5), notifications, earningsHistory })
+    const recentTransactions = transactions.slice(0, 10).map((t) => ({
+      id: t._id.toString(),
+      type: t.type,
+      amount: t.amount,
+      status: t.status,
+      description: t.description,
+      balanceAfter: t.balanceAfter,
+      createdAt: t.createdAt,
+    }))
+
+    return res.json({
+      stats,
+      recentJobs: jobs.slice(0, 5),
+      recentBookings: bookings.slice(0, 10),
+      recentPurchases: purchases.slice(0, 5),
+      notifications,
+      earningsHistory,
+      recentTransactions,
+    })
   } catch (error) {
     console.error('dashboard.getDashboardStats failed', error)
     next(error)

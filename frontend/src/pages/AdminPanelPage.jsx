@@ -6,8 +6,11 @@ import {
   Briefcase,
   CheckCircle2,
   ClipboardList,
+  CreditCard,
+  Download,
   LayoutGrid,
   Menu,
+  Percent,
   RefreshCw,
   Search,
   Settings,
@@ -16,7 +19,7 @@ import {
   Upload,
   UserRound,
   Users,
-  XCircle,
+  Wallet,
 } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import apiClient from '../api/client'
@@ -36,7 +39,6 @@ const AdminPanelPage = () => {
   const { user, token } = useAuth()
   const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState('overview')
-  const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -78,6 +80,13 @@ const AdminPanelPage = () => {
   const [postForm, setPostForm] = useState({ title: '', excerpt: '', body: '', slug: '', category: 'general', status: 'pending' })
   const [editingUserId, setEditingUserId] = useState(null)
   const [editingUser, setEditingUser] = useState({ name: '', email: '', phone: '', profession: '', location: '', role: 'worker' })
+  const [adminBookings, setAdminBookings] = useState([])
+  const [adminPayments, setAdminPayments] = useState([])
+  const [bookingFilter, setBookingFilter] = useState('')
+  const [paymentFilter, setPaymentFilter] = useState('')
+  const [commissionSettings, setCommissionSettings] = useState({ employerCommission: 10, workerCommission: 2 })
+  const [paymentGatewaySettings, setPaymentGatewaySettings] = useState({ razorpayEnabled: true, upiEnabled: true, phonepeEnabled: true, gpayEnabled: true, paytmEnabled: true, razorpayKeyId: '', razorpayKeySecret: '' })
+  const [bookingRuleSettings, setBookingRuleSettings] = useState({ minBookingAmount: 100, maxBookingAmount: 1000000, autoCancelDays: 7 })
 
   const recentLogins = useMemo(() => auditLogs.filter((entry) => entry.action === 'login').slice(0, 6), [auditLogs])
   const activeUserList = useMemo(() => users.filter((entry) => !entry.isSuspended && !entry.isBanned).slice(0, 6), [users])
@@ -86,13 +95,14 @@ const AdminPanelPage = () => {
     if (!token) return
 
     try {
-      setLoading(true)
-      const [overviewRes, statsRes, settingsRes, notificationsRes, auditRes] = await Promise.all([
+      const [overviewRes, statsRes, settingsRes, notificationsRes, auditRes, bookingsRes, paymentsRes] = await Promise.all([
         apiClient.get('/admin/overview', { headers: { Authorization: `Bearer ${token}` } }),
         apiClient.get('/admin/stats', { headers: { Authorization: `Bearer ${token}` } }),
         apiClient.get('/admin/settings', { headers: { Authorization: `Bearer ${token}` } }),
         apiClient.get('/admin/notifications', { headers: { Authorization: `Bearer ${token}` } }),
         apiClient.get('/admin/audit', { headers: { Authorization: `Bearer ${token}` } }),
+        apiClient.get('/admin/bookings/tracking', { headers: { Authorization: `Bearer ${token}` } }),
+        apiClient.get('/admin/payments', { headers: { Authorization: `Bearer ${token}` } }),
       ])
 
       const overview = overviewRes.data || {}
@@ -106,15 +116,35 @@ const AdminPanelPage = () => {
       setPendingContent(overview.pendingContent || [])
       setAuditLogs(auditRes.data.logs || overview.auditLogs || [])
       setSettings({ ...defaultSettings, ...(settingsRes.data.settings || {}) })
+      setAdminBookings(bookingsRes.data?.bookings || [])
+      setAdminPayments(paymentsRes.data?.payments || [])
+      const allSettings = settingsRes.data?.settings || {}
+      setCommissionSettings({
+        employerCommission: Number(allSettings.employerCommission ?? 10),
+        workerCommission: Number(allSettings.workerCommission ?? 2),
+      })
+      setPaymentGatewaySettings({
+        razorpayEnabled: allSettings.razorpayEnabled !== false,
+        upiEnabled: allSettings.upiEnabled !== false,
+        phonepeEnabled: allSettings.phonepeEnabled !== false,
+        gpayEnabled: allSettings.gpayEnabled !== false,
+        paytmEnabled: allSettings.paytmEnabled !== false,
+        razorpayKeyId: allSettings.razorpayKeyId || '',
+        razorpayKeySecret: allSettings.razorpayKeySecret || '',
+      })
+      setBookingRuleSettings({
+        minBookingAmount: Number(allSettings.minBookingAmount ?? 100),
+        maxBookingAmount: Number(allSettings.maxBookingAmount ?? 1000000),
+        autoCancelDays: Number(allSettings.autoCancelDays ?? 7),
+      })
     } catch (error) {
       console.error(error)
       setMessage(error?.response?.data?.message || 'Unable to load the admin dashboard right now.')
-    } finally {
-      setLoading(false)
     }
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboard()
   }, [token])
 
@@ -338,6 +368,11 @@ const AdminPanelPage = () => {
             {[
               { id: 'overview', label: t('admin.navOverview', 'Overview'), icon: LayoutGrid },
               { id: 'users', label: t('admin.navUsers', 'User Management'), icon: Users },
+              { id: 'bookings', label: 'Bookings', icon: Briefcase },
+              { id: 'payments', label: 'Payments', icon: CreditCard },
+              { id: 'commission', label: 'Commission', icon: Percent },
+              { id: 'paymentsGateway', label: 'Payment Gateway', icon: Wallet },
+              { id: 'bookingRules', label: 'Booking Rules', icon: Settings },
               { id: 'activity', label: t('admin.navActivity', 'Activity Log'), icon: ShieldCheck },
               { id: 'moderation', label: t('admin.navModeration', 'Moderation'), icon: ClipboardList },
               { id: 'content', label: t('admin.navContent', 'Content'), icon: BarChart3 },
@@ -714,6 +749,275 @@ const AdminPanelPage = () => {
                     <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-400">{new Date(notification.createdAt).toLocaleString()}</p>
                   </div>
                 )) : <p className="text-sm text-slate-500">No notifications yet.</p>}
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'bookings' ? (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Booking Management</h3>
+                  <p className="text-sm text-slate-500">Track and manage all bookings, commissions, and refunds.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <select value={bookingFilter} onChange={(e) => setBookingFilter(e.target.value)} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <a href="/api/admin/export/bookings?format=csv" className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"><Download size={14} /> Export CSV</a>
+                </div>
+              </div>
+              <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Service</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Employer</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Worker</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Amount</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Commission</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Status</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Refund</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {(bookingFilter ? adminBookings.filter((b) => b.status === bookingFilter) : adminBookings).slice(0, 50).map((booking) => (
+                      <tr key={booking.id}>
+                        <td className="px-3 py-3 font-medium text-slate-900">{booking.serviceTitle}</td>
+                        <td className="px-3 py-3 text-slate-600">{booking.employerName}</td>
+                        <td className="px-3 py-3 text-slate-600">{booking.workerName}</td>
+                        <td className="px-3 py-3 text-slate-600">₹{booking.amount}</td>
+                        <td className="px-3 py-3">
+                          <span className="text-amber-600 font-medium">₹{booking.totalPlatformCommission || 0}</span>
+                          <span className="ml-1 text-xs text-slate-400">({booking.employerCommissionAmount || 0}+{booking.workerCommissionAmount || 0})</span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${booking.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : booking.status === 'pending' ? 'bg-amber-50 text-amber-700' : booking.status === 'cancelled' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-700'}`}>{booking.status?.replace(/_/g, ' ')}</span>
+                        </td>
+                        <td className="px-3 py-3">
+                          {booking.refundStatus === 'pending' ? (
+                            <div className="flex gap-1">
+                              <button onClick={async () => { await apiClient.patch(`/admin/refunds/${booking.id}`, { action: 'approve' }, { headers: { Authorization: `Bearer ${token}` } }); loadDashboard() }} className="rounded bg-emerald-600 px-2 py-1 text-xs text-white">Approve</button>
+                              <button onClick={async () => { await apiClient.patch(`/admin/refunds/${booking.id}`, { action: 'reject' }, { headers: { Authorization: `Bearer ${token}` } }); loadDashboard() }} className="rounded bg-rose-600 px-2 py-1 text-xs text-white">Reject</button>
+                            </div>
+                          ) : booking.refundStatus !== 'none' ? (
+                            <span className="text-xs text-slate-500">{booking.refundStatus}</span>
+                          ) : <span className="text-xs text-slate-400">-</span>}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-500">{booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {adminBookings.length === 0 && <p className="mt-4 text-sm text-slate-500">No bookings found.</p>}
+            </section>
+          ) : null}
+
+          {activeTab === 'payments' ? (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Payment Management</h3>
+                  <p className="text-sm text-slate-500">View all transactions, revenue, and commission details.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <option value="">All Types</option>
+                    <option value="service_payment">Service Payment</option>
+                    <option value="booking_fee">Booking Fee</option>
+                    <option value="application_fee">Application Fee</option>
+                    <option value="premium_membership">Premium</option>
+                    <option value="refund">Refund</option>
+                  </select>
+                  <a href="/api/admin/export/payments?format=csv" className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"><Download size={14} /> Export CSV</a>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Total Revenue</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">₹{stats.totalRevenue || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Employer Commission</p>
+                  <p className="mt-2 text-2xl font-semibold text-amber-600">₹{stats.employerCommission || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Worker Commission</p>
+                  <p className="mt-2 text-2xl font-semibold text-rose-600">₹{stats.workerCommission || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Total Commission</p>
+                  <p className="mt-2 text-2xl font-semibold text-emerald-600">₹{stats.totalCommission || 0}</p>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Today&apos;s Income</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">₹{stats.todayRevenue || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Monthly Income</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">₹{stats.monthlyRevenue || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Payment Success</p>
+                  <p className="mt-2 text-2xl font-semibold text-emerald-600">{stats.paymentSuccess || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Refunds</p>
+                  <p className="mt-2 text-2xl font-semibold text-amber-600">{stats.refunds || 0}</p>
+                </div>
+              </div>
+              <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Employer</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Worker</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Amount</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Employer Comm</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Worker Comm</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Type</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Method</th>
+                      <th className="px-3 py-3 text-left font-semibold text-slate-700">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {(paymentFilter ? adminPayments.filter((p) => p.paymentType === paymentFilter) : adminPayments).slice(0, 50).map((payment) => (
+                      <tr key={payment.id}>
+                        <td className="px-3 py-3 text-slate-600">{payment.employerName}</td>
+                        <td className="px-3 py-3 text-slate-600">{payment.workerName}</td>
+                        <td className="px-3 py-3 font-medium text-slate-900">₹{payment.amount}</td>
+                        <td className="px-3 py-3 text-amber-600">₹{payment.employerCommission || 0}</td>
+                        <td className="px-3 py-3 text-rose-600">₹{payment.workerCommission || 0}</td>
+                        <td className="px-3 py-3 text-xs text-slate-500">{payment.paymentType?.replace(/_/g, ' ')}</td>
+                        <td className="px-3 py-3 text-xs text-slate-500">{payment.paymentMethod || '-'}</td>
+                        <td className="px-3 py-3">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${payment.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : payment.status === 'failed' ? 'bg-rose-50 text-rose-700' : payment.status === 'refunded' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{payment.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {adminPayments.length === 0 && <p className="mt-4 text-sm text-slate-500">No payments found.</p>}
+            </section>
+          ) : null}
+
+          {activeTab === 'commission' ? (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div>
+                <h3 className="text-lg font-semibold">Commission Settings</h3>
+                <p className="text-sm text-slate-500">Configure employer and worker commission percentages. These apply to all new bookings.</p>
+              </div>
+              <div className="mt-6 grid gap-6 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                  <div className="flex items-center gap-2 text-amber-600"><Percent size={20} /> Employer Commission</div>
+                  <p className="mt-2 text-sm text-slate-500">Charged to the employer on top of the job price. Default: 10%</p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <input type="number" value={commissionSettings.employerCommission} onChange={(e) => setCommissionSettings({ ...commissionSettings, employerCommission: Number(e.target.value) })} min="0" max="50" className="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-lg font-bold" />
+                    <span className="text-lg font-medium text-slate-600">%</span>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                  <div className="flex items-center gap-2 text-rose-600"><Percent size={20} /> Worker Commission</div>
+                  <p className="mt-2 text-sm text-slate-500">Deducted from worker earnings. Default: 2%</p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <input type="number" value={commissionSettings.workerCommission} onChange={(e) => setCommissionSettings({ ...commissionSettings, workerCommission: Number(e.target.value) })} min="0" max="50" className="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-lg font-bold" />
+                    <span className="text-lg font-medium text-slate-600">%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-950/30">
+                <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">Example Calculation (Job Price = ₹1000)</p>
+                <div className="mt-2 grid grid-cols-3 gap-4 text-sm">
+                  <div><span className="text-slate-500">Employer Pays:</span> <span className="font-bold">₹{1000 + ((1000 * commissionSettings.employerCommission) / 100)}</span></div>
+                  <div><span className="text-slate-500">Worker Receives:</span> <span className="font-bold text-emerald-600">₹{1000 - ((1000 * commissionSettings.workerCommission) / 100)}</span></div>
+                  <div><span className="text-slate-500">Platform Commission:</span> <span className="font-bold text-amber-600">₹{((1000 * commissionSettings.employerCommission) / 100) + ((1000 * commissionSettings.workerCommission) / 100)}</span></div>
+                </div>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button onClick={async () => { await handleSettingsSave({ preventDefault: () => {} }); await apiClient.put('/admin/settings', commissionSettings, { headers: { Authorization: `Bearer ${token}` } }); setMessage('Commission settings saved successfully.') }} className="rounded-full bg-blue-600 px-6 py-2 text-sm font-medium text-white">Save Commission Settings</button>
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'paymentsGateway' ? (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div>
+                <h3 className="text-lg font-semibold">Payment Gateway Settings</h3>
+                <p className="text-sm text-slate-500">Enable or disable payment methods and configure Razorpay credentials.</p>
+              </div>
+              <div className="mt-6 space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">Razorpay</p>
+                      <p className="text-sm text-slate-500">Credit/Debit Card, Net Banking, Wallet payments</p>
+                    </div>
+                    <button onClick={() => setPaymentGatewaySettings({ ...paymentGatewaySettings, razorpayEnabled: !paymentGatewaySettings.razorpayEnabled })} className={`relative h-6 w-11 rounded-full transition ${paymentGatewaySettings.razorpayEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                      <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${paymentGatewaySettings.razorpayEnabled ? 'left-5.5' : 'left-0.5'}`} style={{ left: paymentGatewaySettings.razorpayEnabled ? '22px' : '2px' }} />
+                    </button>
+                  </div>
+                  {paymentGatewaySettings.razorpayEnabled && (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <input value={paymentGatewaySettings.razorpayKeyId} onChange={(e) => setPaymentGatewaySettings({ ...paymentGatewaySettings, razorpayKeyId: e.target.value })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Razorpay Key ID" />
+                      <input type="password" value={paymentGatewaySettings.razorpayKeySecret} onChange={(e) => setPaymentGatewaySettings({ ...paymentGatewaySettings, razorpayKeySecret: e.target.value })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Razorpay Key Secret" />
+                    </div>
+                  )}
+                </div>
+                {[
+                  { key: 'upiEnabled', name: 'UPI', desc: 'Direct UPI payments' },
+                  { key: 'phonepeEnabled', name: 'PhonePe', desc: 'Pay via PhonePe app' },
+                  { key: 'gpayEnabled', name: 'Google Pay', desc: 'Pay via Google Pay' },
+                  { key: 'paytmEnabled', name: 'Paytm', desc: 'Pay via Paytm app' },
+                ].map((gateway) => (
+                  <div key={gateway.key} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                      <p className="font-semibold text-slate-900">{gateway.name}</p>
+                      <p className="text-sm text-slate-500">{gateway.desc}</p>
+                    </div>
+                    <button onClick={() => setPaymentGatewaySettings({ ...paymentGatewaySettings, [gateway.key]: !paymentGatewaySettings[gateway.key] })} className={`relative h-6 w-11 rounded-full transition ${paymentGatewaySettings[gateway.key] ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                      <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition`} style={{ left: paymentGatewaySettings[gateway.key] ? '22px' : '2px' }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6">
+                <button onClick={async () => { await apiClient.put('/admin/settings', paymentGatewaySettings, { headers: { Authorization: `Bearer ${token}` } }); setMessage('Payment gateway settings saved successfully.') }} className="rounded-full bg-blue-600 px-6 py-2 text-sm font-medium text-white">Save Gateway Settings</button>
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'bookingRules' ? (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div>
+                <h3 className="text-lg font-semibold">Booking Rules</h3>
+                <p className="text-sm text-slate-500">Configure booking limits, auto-cancel rules, and other platform policies.</p>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <label className="text-sm font-medium text-slate-700">Minimum Booking Amount (₹)</label>
+                  <input type="number" value={bookingRuleSettings.minBookingAmount} onChange={(e) => setBookingRuleSettings({ ...bookingRuleSettings, minBookingAmount: Number(e.target.value) })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <label className="text-sm font-medium text-slate-700">Maximum Booking Amount (₹)</label>
+                  <input type="number" value={bookingRuleSettings.maxBookingAmount} onChange={(e) => setBookingRuleSettings({ ...bookingRuleSettings, maxBookingAmount: Number(e.target.value) })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <label className="text-sm font-medium text-slate-700">Auto-Cancel After (Days)</label>
+                  <input type="number" value={bookingRuleSettings.autoCancelDays} onChange={(e) => setBookingRuleSettings({ ...bookingRuleSettings, autoCancelDays: Number(e.target.value) })} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div className="mt-6">
+                <button onClick={async () => { await apiClient.put('/admin/settings', bookingRuleSettings, { headers: { Authorization: `Bearer ${token}` } }); setMessage('Booking rules saved successfully.') }} className="rounded-full bg-blue-600 px-6 py-2 text-sm font-medium text-white">Save Booking Rules</button>
               </div>
             </section>
           ) : null}

@@ -38,76 +38,6 @@ const ensureMongoReady = async () => {
   }
 }
 
-const seedMongoDefaultData = async () => {
-  const existingUsers = await User.countDocuments()
-  if (!existingUsers) {
-    const demoUser = await User.create({
-      name: 'RozWork Demo',
-      email: 'demo@rozwork.com',
-      password: await bcrypt.hash('demo123456', 10),
-      role: 'worker',
-      bio: 'Demo account for RozWork sign-in testing.',
-      location: 'Mumbai, India',
-      skills: ['Plumbing', 'Cleaning', 'Delivery'],
-      phone: '+91 99999 00000',
-      username: 'rozworkdemo',
-      profession: 'General Worker',
-      availability: 'Available now',
-    })
-
-    await User.create({
-      name: 'RozWork Admin',
-      email: 'admin@rozwork.com',
-      password: await bcrypt.hash('admin123456', 10),
-      role: 'admin',
-      username: 'rozworkadmin',
-      profession: 'Platform Administrator',
-      companyName: 'RozWork',
-    })
-
-    await User.create({
-      name: 'Ishvar',
-      email: 'ishvar@rozwork.com',
-      password: await bcrypt.hash('1234567890', 10),
-      role: 'admin',
-      username: 'ishvar',
-      profession: 'Admin Manager',
-      companyName: 'RozWork',
-    })
-
-    await User.create({
-      name: 'Super Admin',
-      email: 'superadmin@rozwork.com',
-      password: await bcrypt.hash('123456789', 10),
-      role: 'super_admin',
-      phone: '9660585691',
-      username: 'superadmin',
-      profession: 'Super Administrator',
-      companyName: 'RozWork',
-    })
-
-    await Job.create({
-      title: 'Farm Labour Support for Harvesting',
-      category: 'Farm Labour',
-      location: 'Nashik, India',
-      salary: '₹400/day',
-      description: 'Help with harvesting, field clearing, and crop handling for a local farm.',
-      postedBy: demoUser._id.toString(),
-      postedByRole: 'worker',
-    })
-
-    await Job.create({
-      title: 'Skilled Plumbing Repair',
-      category: 'Skilled Trades',
-      location: 'Delhi, India',
-      salary: '₹900/day',
-      description: 'Install and repair water lines and plumbing fixtures in a residential building.',
-      postedBy: demoUser._id.toString(),
-      postedByRole: 'worker',
-    })
-  }
-}
-
 const createUser = async (payload) => {
   const mongoReady = await ensureMongoReady()
   if (mongoReady) {
@@ -394,13 +324,7 @@ const listCategories = async () => {
     const categories = await Category.find({}).sort({ createdAt: -1 })
     return categories.map((category) => category.toObject({ versionKey: false }))
   }
-  return [
-    { name: 'Farm Labour', slug: 'farm-labour', description: 'Field support and agricultural work' },
-    { name: 'Skilled Trades', slug: 'skilled-trades', description: 'Plumbing, carpentry, and repair work' },
-    { name: 'Drivers', slug: 'drivers', description: 'Driving and delivery jobs' },
-    { name: 'House Helpers', slug: 'house-helpers', description: 'Cleaning and home support' },
-    { name: 'Students', slug: 'students', description: 'Internships and student-friendly opportunities' },
-  ]
+  return localStore.getJobs ? [] : []
 }
 
 const createCategory = async (payload) => {
@@ -418,14 +342,7 @@ const getSettings = async () => {
     const settings = await Setting.find({})
     return Object.fromEntries(settings.map((setting) => [setting.key, setting.value]))
   }
-  return {
-    siteName: 'RozWork',
-    heroTitle: 'Find real work, hire trusted people, and grow locally.',
-    contactEmail: 'hello@rozwork.com',
-    platformCommission: 5,
-    premiumPrice: 99,
-    applicationFee: 20,
-  }
+  return {}
 }
 
 const updateSettings = async (updates) => {
@@ -524,7 +441,6 @@ const resetState = async () => {
       Post.deleteMany({}),
       AuditLog.deleteMany({}),
     ])
-    await seedMongoDefaultData()
     return true
   }
   inMemoryAuditLogs.length = 0

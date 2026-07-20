@@ -18,42 +18,6 @@ const serializeGalleryItem = (item) => ({
   updatedAt: item.updatedAt,
 })
 
-const defaultGallery = [
-  {
-    title: 'Verified worker showcase',
-    description: 'A polished collection of completed jobs from trusted professionals in the RozWork network.',
-    category: 'Showcase',
-    imageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
-    imageAlt: 'Professional workers collaborating at a site',
-    location: 'Mumbai',
-    tags: ['verified', 'workers', 'portfolio'],
-    featured: true,
-    status: 'published',
-  },
-  {
-    title: 'On-site maintenance work',
-    description: 'High-trust service stories captured from recent bookings and approved completions.',
-    category: 'Maintenance',
-    imageUrl: 'https://images.unsplash.com/photo-1581092795360-fd1ca04f0952?auto=format&fit=crop&w=1200&q=80',
-    imageAlt: 'Technician performing maintenance work',
-    location: 'Delhi',
-    tags: ['maintenance', 'verification'],
-    featured: true,
-    status: 'published',
-  },
-  {
-    title: 'Weekend labour support',
-    description: 'Flexible support crews ready for short-term and urgent field assignments.',
-    category: 'Labour',
-    imageUrl: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80',
-    imageAlt: 'Team of workers preparing site equipment',
-    location: 'Bengaluru',
-    tags: ['labour', 'urgent'],
-    featured: false,
-    status: 'published',
-  },
-]
-
 export const getGallery = async (req, res, next) => {
   try {
     const query = String(req.query.q || '').trim()
@@ -76,11 +40,6 @@ export const getGallery = async (req, res, next) => {
     }
 
     const items = await GalleryItem.find(filter).sort({ featured: -1, createdAt: -1 }).lean()
-
-    if (items.length === 0) {
-      const seededItems = await GalleryItem.create(defaultGallery)
-      return res.json({ gallery: seededItems.map(serializeGalleryItem) })
-    }
 
     return res.json({ gallery: items.map(serializeGalleryItem) })
   } catch (error) {

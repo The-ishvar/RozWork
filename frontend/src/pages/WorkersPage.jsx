@@ -12,14 +12,6 @@ const goalOptions = [
   { id: 'skill-growth', labelKey: 'jobs.skillGrowth' },
 ]
 
-const workerImages = [
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=800&q=80',
-]
-
 
 const getWorkerGoalTags = (worker = {}) => {
   const explicitTags = Array.isArray(worker.goalTags) ? worker.goalTags.map((tag) => String(tag).toLowerCase()) : []
@@ -64,7 +56,7 @@ const WorkersPage = () => {
     loadWorkers()
   }, [])
 
-  const getWorkerImage = (worker, index) => worker.image || worker.photo || workerImages[index % workerImages.length]
+  const getWorkerImage = (worker) => worker.image || worker.photo || ''
 
   const handleGoalSelect = (goalId) => {
     setSelectedGoal(goalId)
@@ -160,12 +152,12 @@ const WorkersPage = () => {
 
       {visibleWorkers.length ? (
         <div id="goal-results" className="mt-8 grid gap-6 lg:grid-cols-2">
-          {visibleWorkers.map((worker, index) => (
+          {visibleWorkers.map((worker) => (
             <div key={worker.id || worker.name} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-center gap-3">
                   <img
-                    src={getWorkerImage(worker, index)}
+                    src={getWorkerImage(worker)}
                     alt={worker.name}
                     className="h-16 w-16 rounded-2xl object-cover shadow-sm"
                   />
