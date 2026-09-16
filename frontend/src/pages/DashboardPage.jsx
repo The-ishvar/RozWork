@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BellRing, Briefcase, CheckCircle2, ShieldCheck, Sparkles, UserRound, Wallet, CreditCard, TrendingUp, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { BellRing, Briefcase, CheckCircle2, ShieldCheck, Sparkles, UserRound, Wallet, CreditCard, TrendingUp, ArrowDownRight, ArrowUpRight, Coins } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -13,7 +13,9 @@ const DashboardPage = () => {
   const [bookings, setBookings] = useState([])
   const [earningsHistory, setEarningsHistory] = useState([])
   const [recentTransactions, setRecentTransactions] = useState([])
+  const [commissionHistory, setCommissionHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [coinInfo, setCoinInfo] = useState(null)
 
   const profileIncomplete = Boolean(user) && (!user.name || !user.phone || !user.profession || !user.location || !user.bio || !user.skills?.length || !user.photo)
 
@@ -21,16 +23,22 @@ const DashboardPage = () => {
     if (!user || !token) return
     try {
       setLoading(true)
-      const [statsRes, bookingsRes, notifsRes] = await Promise.all([
+      const promises = [
         apiClient.get('/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } }),
         apiClient.get('/bookings', { headers: { Authorization: `Bearer ${token}` } }),
         apiClient.get('/notifications', { headers: { Authorization: `Bearer ${token}` } }),
-      ])
+      ]
+      if (user.role === 'employer') {
+        promises.push(apiClient.get('/coins/employer-info', { headers: { Authorization: `Bearer ${token}` } }))
+      }
+      const [statsRes, bookingsRes, notifsRes, coinRes] = await Promise.all(promises)
       setStats(statsRes.data?.stats || {})
       setBookings(bookingsRes.data?.bookings || [])
       setNotifications(notifsRes.data?.notifications || [])
       setEarningsHistory(statsRes.data?.earningsHistory || [])
       setRecentTransactions(statsRes.data?.recentTransactions || [])
+      setCommissionHistory(statsRes.data?.commissionHistory || [])
+      if (coinRes) setCoinInfo(coinRes.data)
     } catch (error) {
       console.error(error)
     } finally {
@@ -66,9 +74,9 @@ const DashboardPage = () => {
     if (role === 'employer') {
       return [
         { label: 'Jobs Posted', value: stats.totalJobsPosted || 0, icon: Briefcase, color: 'blue' },
-        { label: 'Total Spent', value: `₹${stats.totalSpentAmount || 0}`, icon: TrendingUp, color: 'violet' },
-        { label: 'Completed Jobs', value: stats.completedJobs || 0, icon: CheckCircle2, color: 'emerald' },
-        { label: 'Commission Paid', value: `₹${stats.totalCommissionPaid || 0}`, icon: CreditCard, color: 'amber' },
+        { label: 'Coin Balance', value: coinInfo?.coinBalance ?? user?.coinBalance ?? 0, icon: Coins, color: 'emerald' },
+        { label: 'Free Posts', value: coinInfo ? `${coinInfo.freePostsUsed}/${coinInfo.freePostLimit}` : `${user?.freePostsUsed || 0}/3`, icon: Sparkles, color: 'violet' },
+        { label: 'Total Spent', value: `₹${stats.totalSpentAmount || 0}`, icon: TrendingUp, color: 'amber' },
       ]
     }
 
@@ -78,7 +86,7 @@ const DashboardPage = () => {
       { label: 'Users', value: stats.totalUsers || 0, icon: UserRound, color: 'violet' },
       { label: 'Workers', value: stats.totalWorkers || 0, icon: Sparkles, color: 'amber' },
     ]
-  }, [stats, user?.role])
+  }, [stats, user?.role, coinInfo])
 
   const employerBookings = useMemo(() => (bookings || []).filter((b) => b.employerId === user?.id || b.userId === user?.id || b.providerId === user?.id), [bookings, user?.id])
   const workerBookings = useMemo(() => (bookings || []).filter((b) => b.workerId === user?.id || b.providerId === user?.id), [bookings, user?.id])
@@ -212,6 +220,37 @@ const DashboardPage = () => {
                 </div>
               </div>
 
+              {coinInfo && (
+                <div className="rounded-[32px] border border-slate-200 bg-gradient-to-br from-blue-50 to-emerald-50 p-6 shadow-sm dark:from-blue-950/20 dark:to-emerald-950/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Coin Wallet</p>
+                      <h2 className="mt-2 text-xl font-semibold text-slate-900">Your coins and free job posts</h2>
+                    </div>
+                    <Link to="/coins" className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">Buy Coins</Link>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-blue-200 bg-white/70 p-4">
+                      <p className="text-sm text-slate-500">Coin Balance</p>
+                      <p className="mt-2 text-2xl font-bold text-blue-600">{coinInfo.coinBalance}</p>
+                    </div>
+                    <div className="rounded-2xl border border-violet-200 bg-white/70 p-4">
+                      <p className="text-sm text-slate-500">Free Posts Used</p>
+                      <p className="mt-2 text-2xl font-bold text-violet-600">{coinInfo.freePostsUsed}/{coinInfo.freePostLimit}</p>
+                    </div>
+                    <div className="rounded-2xl border border-emerald-200 bg-white/70 p-4">
+                      <p className="text-sm text-slate-500">Cost per Post</p>
+                      <p className="mt-2 text-2xl font-bold text-emerald-600">{coinInfo.jobPostCoins} coins</p>
+                    </div>
+                  </div>
+                  {coinInfo.freePostsUsed >= coinInfo.freePostLimit && coinInfo.coinBalance < coinInfo.jobPostCoins && (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                      You have used all free posts and have insufficient coins. Buy coins to post more jobs.
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -235,6 +274,26 @@ const DashboardPage = () => {
                       <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{item.status}</div>
                     </div>
                   )) : <p className="text-sm text-slate-500">No completed transactions yet.</p>}
+
+                  {commissionHistory.length ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-sm font-semibold text-amber-800">Commission deductions</p>
+                      <div className="mt-3 space-y-2">
+                        {commissionHistory.slice(0, 4).map((item) => (
+                          <div key={item.id} className="flex items-center justify-between rounded-xl border border-amber-100 bg-white/70 p-2.5">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">{item.jobName}</p>
+                              <p className="text-xs text-slate-500">{item.completedAt ? new Date(item.completedAt).toLocaleDateString() : 'Recent'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-rose-600">-₹{item.commissionAmount}</p>
+                              <p className="text-xs text-slate-500">{item.coinsDeducted} coins</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </>

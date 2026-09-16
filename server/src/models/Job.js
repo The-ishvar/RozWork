@@ -19,6 +19,9 @@ const jobSchema = new mongoose.Schema(
     status: { type: String, enum: ['pending', 'approved', 'rejected', 'completed', 'expired'], default: 'approved' },
     goalTags: { type: [String], default: [] },
     applicants: { type: [mongoose.Schema.Types.ObjectId], ref: 'User', default: [] },
+    featured: { type: Boolean, default: false },
+    hidden: { type: Boolean, default: false },
+    postType: { type: String, enum: ['free', 'paid'], default: 'free' },
   },
   { timestamps: true },
 )

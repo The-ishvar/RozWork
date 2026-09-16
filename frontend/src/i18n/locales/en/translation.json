@@ -5,7 +5,6 @@
     "browse": "Browse",
     "jobs": "Jobs",
     "workers": "Workers",
-    "gallery": "Gallery",
     "dashboard": "Dashboard",
     "profile": "Profile",
     "admin": "Admin",
@@ -28,7 +27,6 @@
     "home": "Home",
     "jobs": "Jobs",
     "workers": "Workers",
-    "gallery": "Gallery",
     "chat": "Chat",
     "notifications": "Notifications",
     "profile": "Profile",
@@ -109,18 +107,6 @@
     "skillGrowth": "Skill growth",
     "filtersHint": "These filters help you find work quickly based on your earning, schedule, or learning goals.",
     "applicationSubmitted": "Application submitted"
-  },
-  "gallery": {
-    "title": "Gallery",
-    "heroTitle": "A live portfolio of trusted work and verified stories",
-    "heroSubtitle": "Browse the latest marketplace highlights, featured services, and completed projects from the RozWork community.",
-    "featuredWork": "Featured work",
-    "searchPlaceholder": "Search gallery items",
-    "allCategories": "All categories",
-    "loading": "Loading gallery...",
-    "noItems": "No gallery items match the current search.",
-    "featured": "Featured",
-    "remote": "Remote"
   },
   "workers": {
     "title": "Worker marketplace",

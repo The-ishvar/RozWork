@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { motion } from 'framer-motion'
 import {
-  Briefcase, MapPin, Search, Filter, IndianRupee, Clock, GraduationCap,
-  ChevronDown, ChevronUp, X, Plus, ExternalLink, Loader2
+  Briefcase, MapPin, Search, Filter, Clock, GraduationCap,
+  X, Plus, ExternalLink, Wallet, Coins
 } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import client from '../api/client'
@@ -25,11 +25,9 @@ const workTypes = ['Full Time', 'Part Time', 'Contract', 'Daily Wage', 'Temporar
 
 const experienceLevels = ['Fresher', '1-2 Years', '3-5 Years', '5+ Years']
 
-const educationLevels = ['No Requirement', '10th Pass', '12th Pass', 'Graduate', 'Post Graduate', 'Diploma']
-
 const JobsPage = () => {
   const { user, token } = useAuth()
-  const { t, isHindi } = useLanguage()
+  const { isHindi } = useLanguage()
   const toast = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -39,25 +37,23 @@ const JobsPage = () => {
   const [showFilters, setShowFilters] = useState(false)
   const [showPostForm, setShowPostForm] = useState(false)
   const [posting, setPosting] = useState(false)
+  const [coinInfo, setCoinInfo] = useState({ coinBalance: 0, freePostsUsed: 0, freePostLimit: 3, jobPostCoins: 10, canPostForFree: true, hasEnoughCoins: false })
 
   const [filters, setFilters] = useState({
     search: searchParams.get('q') || '',
     category: searchParams.get('category') || 'all',
     workType: 'all',
     experience: 'all',
-    education: 'all',
     salaryMin: '',
     salaryMax: '',
     location: searchParams.get('location') || '',
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm()
+  const { register, handleSubmit, reset } = useForm()
 
   const canCreatePosts = ['employer', 'admin', 'super_admin'].includes(user?.role)
-
-  useEffect(() => {
-    fetchJobs()
-  }, [])
+  const isAdmin = ['admin', 'super_admin'].includes(user?.role)
+  const canActuallyPost = canCreatePosts && (isAdmin || coinInfo.canPostForFree || coinInfo.hasEnoughCoins)
 
   const fetchJobs = async () => {
     setLoading(true)
@@ -71,11 +67,27 @@ const JobsPage = () => {
     }
   }
 
+  const fetchCoinInfo = async () => {
+    try {
+      const { data } = await client.get('/coins/employer-info', { headers: { Authorization: `Bearer ${token}` } })
+      setCoinInfo(data)
+    } catch {
+      // silent
+    }
+  }
+
+  useEffect(() => {
+    fetchJobs()
+    if (token && canCreatePosts && !isAdmin) {
+      fetchCoinInfo()
+    }
+  }, [token, user?.role])
+
   const onSubmitJob = async (values) => {
     if (!canCreatePosts) return
     setPosting(true)
     try {
-      await client.post('/jobs', {
+      const { data } = await client.post('/jobs', {
         ...values,
         title: values.title?.trim(),
         category: values.category || values.title?.trim() || 'Other',
@@ -88,12 +100,25 @@ const JobsPage = () => {
         workType: values.workType || 'Full Time',
         postedByRole: user?.role || 'employer',
       })
+      if (data.coinInfo) {
+        setCoinInfo((prev) => ({
+          ...prev,
+          coinBalance: data.coinInfo.coinBalance,
+          freePostsUsed: data.coinInfo.freePostsUsed,
+          canPostForFree: data.coinInfo.freePostsUsed < data.coinInfo.freePostLimit,
+          hasEnoughCoins: data.coinInfo.coinBalance >= prev.jobPostCoins,
+        }))
+      }
       toast.success('Posted!', isHindi ? 'Job सफलतापूर्वक post हो गई' : 'Job posted successfully')
       reset()
       setShowPostForm(false)
       fetchJobs()
     } catch (err) {
-      toast.error('Error', err.response?.data?.message || 'Job post नहीं हो सकी')
+      if (err.response?.data?.code === 'INSUFFICIENT_COINS') {
+        toast.error('Insufficient Coins', err.response.data.message)
+      } else {
+        toast.error('Error', err.response?.data?.message || 'Job post नहीं हो सकी')
+      }
     } finally {
       setPosting(false)
     }
@@ -116,7 +141,7 @@ const JobsPage = () => {
   const clearFilters = () => {
     setFilters({
       search: '', category: 'all', workType: 'all', experience: 'all',
-      education: 'all', salaryMin: '', salaryMax: '', location: '',
+      salaryMin: '', salaryMax: '', location: '',
     })
   }
 
@@ -153,15 +178,42 @@ const JobsPage = () => {
               {filteredJobs.length} {isHindi ? 'नौकरियाँ उपलब्ध' : 'jobs available'}
             </p>
           </div>
-          {canCreatePosts && (
-            <Button
-              onClick={() => setShowPostForm(!showPostForm)}
-              icon={showPostForm ? X : Plus}
-            >
-              {isHindi ? 'नई Job Post करें' : 'Post New Job'}
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {canCreatePosts && !isAdmin && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
+                  <Coins size={16} className="text-blue-600" />
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{coinInfo.coinBalance} coins</span>
+                </div>
+                <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
+                  <span className="text-slate-500">Free posts: </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{coinInfo.freePostsUsed}/{coinInfo.freePostLimit}</span>
+                </div>
+              </div>
+            )}
+            {canCreatePosts && (
+              canActuallyPost ? (
+                <Button
+                  onClick={() => setShowPostForm(!showPostForm)}
+                  icon={showPostForm ? X : Plus}
+                >
+                  {isHindi ? 'नई Job Post करें' : 'Post New Job'}
+                </Button>
+              ) : (
+                <Link to="/coins" className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 transition">
+                  <Wallet size={16} />
+                  Buy Coins
+                </Link>
+              )
+            )}
+          </div>
         </div>
+
+        {canCreatePosts && !isAdmin && !coinInfo.canPostForFree && !coinInfo.hasEnoughCoins && (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            You have used all your free job posts. Please buy coins to post more jobs. (1 Job Post = {coinInfo.jobPostCoins} Coins)
+          </div>
+        )}
 
         {/* Post Job Form */}
         {showPostForm && canCreatePosts && (

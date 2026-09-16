@@ -1,10 +1,11 @@
 import mongoose from 'mongoose'
+import { getMongoUri } from '../config/env.js'
 
 const DEFAULT_MONGO_URI = 'mongodb://127.0.0.1:27017/rozwork'
 let connectionPromise = null
 
 const resolveMongoUri = () => {
-  const configuredUri = process.env.MONGODB_URI || process.env.MONGO_URI || process.env.MONGODB_URL || process.env.MONGO_URL
+  const configuredUri = getMongoUri()
 
   if (configuredUri) {
     return configuredUri
@@ -64,35 +65,25 @@ export const connectToDatabase = async () => {
       console.warn('MongoDB disconnected')
     })
 
-    const primaryUri = resolveMongoUri()
-    const candidateUris = [primaryUri]
+    const mongoUri = resolveMongoUri()
+    console.log(`Connecting to MongoDB at ${mongoUri.replace(/\/\/([^:@]+):([^@]+)@/, '//***:***@')}`)
 
-    if (!candidateUris.includes(DEFAULT_MONGO_URI)) {
-      candidateUris.push(DEFAULT_MONGO_URI)
+    try {
+      await mongoose.connect(mongoUri, {
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 20000,
+        maxPoolSize: 10,
+        retryWrites: true,
+        w: 'majority',
+      })
+
+      console.log(`MongoDB connection established: ${mongoose.connection.host}/${mongoose.connection.name}`)
+      return mongoose.connection
+    } catch (error) {
+      console.warn(`MongoDB connection failed: ${error.message}`)
+      throw error
     }
-
-    let lastError
-    for (const mongoUri of candidateUris) {
-      try {
-        console.log(`Connecting to MongoDB at ${mongoUri.replace(/\/\/([^:@]+):([^@]+)@/, '//***:***@')}`)
-        await mongoose.connect(mongoUri, {
-          serverSelectionTimeoutMS: 10000,
-          connectTimeoutMS: 10000,
-          socketTimeoutMS: 20000,
-          maxPoolSize: 10,
-          retryWrites: true,
-          w: 'majority',
-        })
-
-        console.log(`MongoDB connection established: ${mongoose.connection.host}/${mongoose.connection.name}`)
-        return mongoose.connection
-      } catch (error) {
-        lastError = error
-        console.warn(`MongoDB connection failed for ${mongoUri}: ${error.message}`)
-      }
-    }
-
-    throw lastError || new Error('Unable to connect to MongoDB')
   })()
 
   try {

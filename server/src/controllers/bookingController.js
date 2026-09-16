@@ -4,6 +4,7 @@ import Job from '../models/Job.js'
 import Transaction from '../models/Transaction.js'
 import User from '../models/User.js'
 import Setting from '../models/Setting.js'
+import CommissionHistory from '../models/CommissionHistory.js'
 import { createNotification, notifyAdmins } from '../utils/notify.js'
 import { recordUserActivity } from '../utils/activity.js'
 import { emitPlatformEvent } from '../utils/events.js'
@@ -465,6 +466,43 @@ export const verifyBooking = async (req, res, next) => {
       await employer.save()
     }
 
+    let commissionHistory = null
+    if (employer) {
+      const commissionAmount = Number(commissions.employerCommissionAmount || 0)
+      if (commissionAmount > 0) {
+        const previousBalance = Number(employer.coinBalance || 0)
+        const nextBalance = previousBalance - commissionAmount
+        if (nextBalance < 0) {
+          throw new Error('Employer coin balance is insufficient for commission deduction')
+        }
+
+        employer.coinBalance = nextBalance
+        employer.totalUsedCoins = Number(employer.totalUsedCoins || 0) + commissionAmount
+        employer.totalPurchasedCoins = Number(employer.totalPurchasedCoins || 0)
+        await employer.save()
+
+        commissionHistory = await CommissionHistory.create({
+          employerId: employer._id,
+          employerName: employer.name || '',
+          employerEmail: employer.email || '',
+          employerPhone: employer.phone || '',
+          workerId: worker?._id || null,
+          workerName: worker?.name || '',
+          bookingId: booking._id,
+          jobName: booking.serviceTitle || '',
+          jobAmount: jobPrice,
+          commissionAmount,
+          coinsDeducted: commissionAmount,
+          status: 'completed',
+          paymentStatus: 'paid',
+          completedAt: new Date(),
+          adminId: null,
+          adminName: '',
+          note: 'Employer commission deducted after booking verification',
+        })
+      }
+    }
+
     await Job.findByIdAndUpdate(booking.jobId, { status: 'completed' }, { new: true }).catch(() => {})
 
     const payment = await Payment.create({
@@ -583,6 +621,14 @@ export const verifyBooking = async (req, res, next) => {
         employerPays: commissions.employerPays,
         workerReceives: commissions.workerReceives,
       },
+      commissionHistory: commissionHistory ? {
+        id: commissionHistory._id.toString(),
+        employerId: commissionHistory.employerId?.toString?.() || null,
+        bookingId: commissionHistory.bookingId?.toString?.() || null,
+        commissionAmount: commissionHistory.commissionAmount,
+        coinsDeducted: commissionHistory.coinsDeducted,
+        status: commissionHistory.status,
+      } : null,
     })
   } catch (error) {
     console.error('bookings.verify failed', error)

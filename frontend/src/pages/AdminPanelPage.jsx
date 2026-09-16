@@ -87,60 +87,83 @@ const AdminPanelPage = () => {
   const [commissionSettings, setCommissionSettings] = useState({ employerCommission: 10, workerCommission: 2 })
   const [paymentGatewaySettings, setPaymentGatewaySettings] = useState({ razorpayEnabled: true, upiEnabled: true, phonepeEnabled: true, gpayEnabled: true, paytmEnabled: true, razorpayKeyId: '', razorpayKeySecret: '' })
   const [bookingRuleSettings, setBookingRuleSettings] = useState({ minBookingAmount: 100, maxBookingAmount: 1000000, autoCancelDays: 7 })
+  const [coinRequests, setCoinRequests] = useState([])
+  const [coinHistory, setCoinHistory] = useState([])
+  const [coinWalletSearch, setCoinWalletSearch] = useState('')
+  const [coinAdjustForm, setCoinAdjustForm] = useState({ userId: '', amount: '', action: 'add', reason: '', adminPassword: '' })
+  const [coinLimitForm, setCoinLimitForm] = useState({ userId: '', dailyCoinLimit: '', adminPassword: '' })
+  const [coinSettings, setCoinSettings] = useState({ phonePeNumber: '9660585691', upiId: 'rozwork@upi', qrCodeUrl: '', coinRate: 1, adminPassword: '9660585691', packages: [], usageRules: { jobPosts: 20, jobPostCoins: 50, featuredJobCoins: 10, premiumEmployerCoins: 100, advertisementCoins: 200 } })
+  const [paymentRequestSearch, setPaymentRequestSearch] = useState('')
+  const [paymentRequestStatusFilter, setPaymentRequestStatusFilter] = useState('all')
+  const [paymentRequestDateFilter, setPaymentRequestDateFilter] = useState('')
 
   const recentLogins = useMemo(() => auditLogs.filter((entry) => entry.action === 'login').slice(0, 6), [auditLogs])
   const activeUserList = useMemo(() => users.filter((entry) => !entry.isSuspended && !entry.isBanned).slice(0, 6), [users])
 
+  const authHeaders = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+
   const loadDashboard = async () => {
     if (!token) return
 
-    try {
-      const [overviewRes, statsRes, settingsRes, notificationsRes, auditRes, bookingsRes, paymentsRes] = await Promise.all([
-        apiClient.get('/admin/overview', { headers: { Authorization: `Bearer ${token}` } }),
-        apiClient.get('/admin/stats', { headers: { Authorization: `Bearer ${token}` } }),
-        apiClient.get('/admin/settings', { headers: { Authorization: `Bearer ${token}` } }),
-        apiClient.get('/admin/notifications', { headers: { Authorization: `Bearer ${token}` } }),
-        apiClient.get('/admin/audit', { headers: { Authorization: `Bearer ${token}` } }),
-        apiClient.get('/admin/bookings/tracking', { headers: { Authorization: `Bearer ${token}` } }),
-        apiClient.get('/admin/payments', { headers: { Authorization: `Bearer ${token}` } }),
-      ])
-
-      const overview = overviewRes.data || {}
-      const statsPayload = statsRes.data?.stats || {}
-      setStats((previous) => ({ ...previous, ...(overview.stats || {}), ...statsPayload }))
-      setUsers(overview.users || [])
-      setJobs(overview.jobs || [])
-      setPosts(overview.posts || [])
-      setNotifications(notificationsRes.data.notifications || [])
-      setActivities(overview.activities || [])
-      setPendingContent(overview.pendingContent || [])
-      setAuditLogs(auditRes.data.logs || overview.auditLogs || [])
-      setSettings({ ...defaultSettings, ...(settingsRes.data.settings || {}) })
-      setAdminBookings(bookingsRes.data?.bookings || [])
-      setAdminPayments(paymentsRes.data?.payments || [])
-      const allSettings = settingsRes.data?.settings || {}
-      setCommissionSettings({
-        employerCommission: Number(allSettings.employerCommission ?? 10),
-        workerCommission: Number(allSettings.workerCommission ?? 2),
-      })
-      setPaymentGatewaySettings({
-        razorpayEnabled: allSettings.razorpayEnabled !== false,
-        upiEnabled: allSettings.upiEnabled !== false,
-        phonepeEnabled: allSettings.phonepeEnabled !== false,
-        gpayEnabled: allSettings.gpayEnabled !== false,
-        paytmEnabled: allSettings.paytmEnabled !== false,
-        razorpayKeyId: allSettings.razorpayKeyId || '',
-        razorpayKeySecret: allSettings.razorpayKeySecret || '',
-      })
-      setBookingRuleSettings({
-        minBookingAmount: Number(allSettings.minBookingAmount ?? 100),
-        maxBookingAmount: Number(allSettings.maxBookingAmount ?? 1000000),
-        autoCancelDays: Number(allSettings.autoCancelDays ?? 7),
-      })
-    } catch (error) {
-      console.error(error)
-      setMessage(error?.response?.data?.message || 'Unable to load the admin dashboard right now.')
+    const safeGet = async (url) => {
+      try {
+        return await apiClient.get(url, authHeaders)
+      } catch (error) {
+        console.warn(`[admin] failed to load ${url}:`, error?.response?.data?.message || error.message)
+        return null
+      }
     }
+
+    const overviewRes = await safeGet('/admin/overview')
+    const statsRes = await safeGet('/admin/stats')
+    const settingsRes = await safeGet('/admin/settings')
+    const notificationsRes = await safeGet('/admin/notifications')
+    const auditRes = await safeGet('/admin/audit')
+    const bookingsRes = await safeGet('/admin/bookings/tracking')
+    const paymentsRes = await safeGet('/admin/payments')
+    const coinRequestsRes = await safeGet('/coins/admin/requests')
+    const coinHistoryRes = await safeGet('/coins/admin/history')
+    const coinSettingsRes = await safeGet('/coins/settings')
+
+    const overview = overviewRes?.data || {}
+    const statsPayload = statsRes?.data?.stats || {}
+    setStats((previous) => ({ ...previous, ...(overview.stats || {}), ...statsPayload }))
+    setUsers(overview.users || [])
+    setJobs(overview.jobs || [])
+    setPosts(overview.posts || [])
+    setNotifications(notificationsRes?.data?.notifications || [])
+    setActivities(overview.activities || [])
+    setPendingContent(overview.pendingContent || [])
+    setAuditLogs(auditRes?.data?.logs || overview.auditLogs || [])
+    setSettings({ ...defaultSettings, ...(settingsRes?.data?.settings || {}) })
+    setAdminBookings(bookingsRes?.data?.bookings || [])
+    setAdminPayments(paymentsRes?.data?.payments || [])
+    const sortedCoinRequests = (coinRequestsRes?.data?.requests || []).sort((a, b) => {
+      const order = { pending: 0, approved: 1, rejected: 2 }
+      return (order[a.status] ?? 99) - (order[b.status] ?? 99)
+    })
+    setCoinRequests(sortedCoinRequests)
+    setCoinHistory(coinHistoryRes?.data?.history || [])
+    setCoinSettings(coinSettingsRes?.data?.settings || { phonePeNumber: '9660585691', upiId: 'rozwork@upi', qrCodeUrl: '', coinRate: 1, adminPassword: '9660585691', packages: [], usageRules: { jobPosts: 20, jobPostCoins: 50, featuredJobCoins: 10, premiumEmployerCoins: 100, advertisementCoins: 200 } })
+    const allSettings = settingsRes?.data?.settings || {}
+    setCommissionSettings({
+      employerCommission: Number(allSettings.employerCommission ?? 10),
+      workerCommission: Number(allSettings.workerCommission ?? 2),
+    })
+    setPaymentGatewaySettings({
+      razorpayEnabled: allSettings.razorpayEnabled !== false,
+      upiEnabled: allSettings.upiEnabled !== false,
+      phonepeEnabled: allSettings.phonepeEnabled !== false,
+      gpayEnabled: allSettings.gpayEnabled !== false,
+      paytmEnabled: allSettings.paytmEnabled !== false,
+      razorpayKeyId: allSettings.razorpayKeyId || '',
+      razorpayKeySecret: allSettings.razorpayKeySecret || '',
+    })
+    setBookingRuleSettings({
+      minBookingAmount: Number(allSettings.minBookingAmount ?? 100),
+      maxBookingAmount: Number(allSettings.maxBookingAmount ?? 1000000),
+      autoCancelDays: Number(allSettings.autoCancelDays ?? 7),
+    })
   }
 
   useEffect(() => {
@@ -245,6 +268,50 @@ const AdminPanelPage = () => {
       await loadDashboard()
     } catch (error) {
       setMessage(error?.response?.data?.message || 'Unable to delete the content.')
+    }
+  }
+
+  const handleCoinReview = async (requestId, status) => {
+    try {
+      await apiClient.post(`/coins/admin/requests/${requestId}/review`, { status, adminPassword: coinSettings.adminPassword, adminNote: '' }, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage(`Coin request ${status}d successfully.`)
+      await loadDashboard()
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to review the coin request.')
+    }
+  }
+
+  const handleCoinAdjustment = async (event) => {
+    event.preventDefault()
+    try {
+      await apiClient.post('/coins/admin/adjust', coinAdjustForm, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Coin adjustment completed.')
+      setCoinAdjustForm({ userId: '', amount: '', action: 'add', reason: '', adminPassword: '' })
+      await loadDashboard()
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to adjust coins.')
+    }
+  }
+
+  const handleCoinLimitUpdate = async (event) => {
+    event.preventDefault()
+    try {
+      await apiClient.post('/coins/admin/limit', coinLimitForm, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Daily coin limit updated.')
+      setCoinLimitForm({ userId: '', dailyCoinLimit: '', adminPassword: '' })
+      await loadDashboard()
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to update daily coin limit.')
+    }
+  }
+
+  const handleCoinSettingsSave = async () => {
+    try {
+      await apiClient.post('/coins/settings', coinSettings, { headers: { Authorization: `Bearer ${token}` } })
+      setMessage('Coin settings saved successfully.')
+      await loadDashboard()
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Unable to save coin settings.')
     }
   }
 
@@ -370,9 +437,11 @@ const AdminPanelPage = () => {
               { id: 'users', label: t('admin.navUsers', 'User Management'), icon: Users },
               { id: 'bookings', label: 'Bookings', icon: Briefcase },
               { id: 'payments', label: 'Payments', icon: CreditCard },
+              { id: 'paymentRequests', label: 'Payment Requests', icon: CreditCard },
               { id: 'commission', label: 'Commission', icon: Percent },
               { id: 'paymentsGateway', label: 'Payment Gateway', icon: Wallet },
               { id: 'bookingRules', label: 'Booking Rules', icon: Settings },
+              { id: 'coins', label: 'Coin Wallet', icon: Wallet },
               { id: 'activity', label: t('admin.navActivity', 'Activity Log'), icon: ShieldCheck },
               { id: 'moderation', label: t('admin.navModeration', 'Moderation'), icon: ClipboardList },
               { id: 'content', label: t('admin.navContent', 'Content'), icon: BarChart3 },
@@ -381,10 +450,12 @@ const AdminPanelPage = () => {
             ].map((item) => {
               const Icon = item.icon
               const isActive = activeTab === item.id
+              const badge = item.id === 'paymentRequests' ? coinRequests.filter((r) => r.status === 'pending').length : 0
               return (
                 <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
                   <Icon size={16} />
                   {item.label}
+                  {badge > 0 ? <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">{badge}</span> : null}
                 </button>
               )
             })}
@@ -1000,7 +1071,7 @@ const AdminPanelPage = () => {
             <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
               <div>
                 <h3 className="text-lg font-semibold">Booking Rules</h3>
-                <p className="text-sm text-slate-500">Configure booking limits, auto-cancel rules, and other platform policies.</p>
+                <p className="mt-1 text-sm text-slate-500">Configure booking limits, auto-cancel rules, and other platform policies.</p>
               </div>
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1018,6 +1089,195 @@ const AdminPanelPage = () => {
               </div>
               <div className="mt-6">
                 <button onClick={async () => { await apiClient.put('/admin/settings', bookingRuleSettings, { headers: { Authorization: `Bearer ${token}` } }); setMessage('Booking rules saved successfully.') }} className="rounded-full bg-blue-600 px-6 py-2 text-sm font-medium text-white">Save Booking Rules</button>
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'paymentRequests' ? (
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Payment Requests</h3>
+                  <p className="text-sm text-slate-500">Review and manage coin purchase payment requests from employers.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <select value={paymentRequestStatusFilter} onChange={(e) => setPaymentRequestStatusFilter(e.target.value)} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <input type="date" value={paymentRequestDateFilter} onChange={(e) => setPaymentRequestDateFilter(e.target.value)} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
+                  <div className="relative">
+                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input value={paymentRequestSearch} onChange={(e) => setPaymentRequestSearch(e.target.value)} className="w-full max-w-xs rounded-full border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm" placeholder="Search by name, phone, or txn ID" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Pending</p>
+                  <p className="mt-2 text-2xl font-semibold text-amber-600">{coinRequests.filter((r) => r.status === 'pending').length}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Approved</p>
+                  <p className="mt-2 text-2xl font-semibold text-emerald-600">{coinRequests.filter((r) => r.status === 'approved').length}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Rejected</p>
+                  <p className="mt-2 text-2xl font-semibold text-rose-600">{coinRequests.filter((r) => r.status === 'rejected').length}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Total Revenue</p>
+                  <p className="mt-2 text-2xl font-semibold text-blue-600">₹{coinRequests.filter((r) => r.status === 'approved').reduce((sum, r) => sum + (r.amount || 0), 0)}</p>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                {(() => {
+                  const filtered = coinRequests.filter((r) => {
+                    const matchesStatus = paymentRequestStatusFilter === 'all' || r.status === paymentRequestStatusFilter
+                    const matchesDate = !paymentRequestDateFilter || new Date(r.createdAt).toISOString().slice(0, 10) === paymentRequestDateFilter
+                    const query = paymentRequestSearch.toLowerCase()
+                    const matchesSearch = !query || [r.userName, r.userEmail, r.userPhone, r.utrNumber, r.mobileNumberUsed].join(' ').toLowerCase().includes(query)
+                    return matchesStatus && matchesDate && matchesSearch
+                  })
+                  return filtered.length ? filtered.map((request) => (
+                    <div key={request._id || request.id} className={`rounded-2xl border p-4 ${request.status === 'pending' ? 'border-amber-200 bg-amber-50/50' : request.status === 'approved' ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'}`}>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-slate-900">{request.userName || 'Unknown'}</p>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${request.status === 'pending' ? 'bg-amber-100 text-amber-700' : request.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{request.status}</span>
+                          </div>
+                          <p className="text-sm text-slate-500">Plan: <span className="font-medium text-slate-700">{request.packageLabel || request.packageId}</span> &mdash; ₹{request.amount} for {request.coins} coins</p>
+                          <p className="text-sm text-slate-500">Email: {request.userEmail || 'N/A'} &bull; Phone: {request.userPhone || 'N/A'}</p>
+                          <p className="text-sm text-slate-500">Payment Mobile: {request.mobileNumberUsed || 'N/A'} &bull; UTR: {request.utrNumber || 'N/A'}</p>
+                          {request.note && <p className="text-sm text-slate-500">Note: {request.note}</p>}
+                          {request.screenshotUrl ? <a href={request.screenshotUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 underline">View Screenshot</a> : <span className="text-sm text-slate-400">No screenshot</span>}
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Submitted: {new Date(request.createdAt).toLocaleString()}</p>
+                        </div>
+                        {request.status === 'pending' && (
+                          <div className="flex flex-wrap gap-2">
+                            <button onClick={() => handleCoinReview(request._id || request.id, 'approved')} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition">Approve</button>
+                            <button onClick={() => handleCoinReview(request._id || request.id, 'rejected')} className="rounded-full border border-rose-300 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 transition">Reject</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-slate-500">No payment requests found.</p>
+                })()}
+              </div>
+            </section>
+          ) : null}
+
+          {activeTab === 'coins' ? (
+            <section className="space-y-6">
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Coin Requests</h3>
+                    <p className="text-sm text-slate-500">Approve or reject manual coin purchase requests from users.</p>
+                  </div>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {coinRequests.length ? coinRequests.map((request) => (
+                    <div key={request._id || request.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-1">
+                          <p className="font-semibold text-slate-900">{request.userName || request.userEmail || 'Unknown user'}</p>
+                          <p className="text-sm text-slate-500">Email: {request.userEmail || 'N/A'} • User ID: {request.submittedUserId || request.userId || 'N/A'}</p>
+                          <p className="text-sm text-slate-500">Phone: {request.userPhone || 'N/A'} • Package: {request.packageLabel || request.packageId || 'N/A'} • Amount: ₹{request.amount}</p>
+                          <p className="text-sm text-slate-500">Coins: {request.coins || 0} • UTR: {request.utrNumber || 'N/A'}</p>
+                          {request.screenshotUrl ? <a href={request.screenshotUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 underline">View screenshot</a> : <span className="text-sm text-slate-400">No screenshot attached</span>}
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Status: {request.status} • {new Date(request.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => handleCoinReview(request._id || request.id, 'approved')} className="rounded-full bg-emerald-600 px-3 py-2 text-sm font-medium text-white">Approve</button>
+                          <button onClick={() => handleCoinReview(request._id || request.id, 'rejected')} className="rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700">Reject</button>
+                        </div>
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-slate-500">No coin requests pending.</p>}
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Wallet Management</h3>
+                    <p className="text-sm text-slate-500">Add or remove coins and update daily coin limits with admin password verification.</p>
+                  </div>
+                </div>
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <form onSubmit={handleCoinAdjustment} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <h4 className="font-semibold text-slate-900">Adjust Coins</h4>
+                    <div className="mt-3 space-y-3">
+                      <input value={coinAdjustForm.userId} onChange={(event) => setCoinAdjustForm({ ...coinAdjustForm, userId: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="User ID" required />
+                      <input type="number" value={coinAdjustForm.amount} onChange={(event) => setCoinAdjustForm({ ...coinAdjustForm, amount: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Amount" required />
+                      <select value={coinAdjustForm.action} onChange={(event) => setCoinAdjustForm({ ...coinAdjustForm, action: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                        <option value="add">Add</option>
+                        <option value="remove">Remove</option>
+                      </select>
+                      <input value={coinAdjustForm.reason} onChange={(event) => setCoinAdjustForm({ ...coinAdjustForm, reason: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Reason" required />
+                      <input type="password" value={coinAdjustForm.adminPassword} onChange={(event) => setCoinAdjustForm({ ...coinAdjustForm, adminPassword: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Admin Password" required />
+                      <button type="submit" className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Apply</button>
+                    </div>
+                  </form>
+                  <form onSubmit={handleCoinLimitUpdate} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <h4 className="font-semibold text-slate-900">Daily Coin Limit</h4>
+                    <div className="mt-3 space-y-3">
+                      <input value={coinLimitForm.userId} onChange={(event) => setCoinLimitForm({ ...coinLimitForm, userId: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="User ID" required />
+                      <input type="number" value={coinLimitForm.dailyCoinLimit} onChange={(event) => setCoinLimitForm({ ...coinLimitForm, dailyCoinLimit: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Daily Limit" required />
+                      <input type="password" value={coinLimitForm.adminPassword} onChange={(event) => setCoinLimitForm({ ...coinLimitForm, adminPassword: event.target.value })} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Admin Password" required />
+                      <button type="submit" className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Save Limit</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Coin Settings</h3>
+                    <p className="text-sm text-slate-500">Manage PhonePe, UPI, coin packages, rate, and usage rules.</p>
+                  </div>
+                </div>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <input value={coinSettings.phonePeNumber || ''} onChange={(event) => setCoinSettings({ ...coinSettings, phonePeNumber: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="PhonePe Number" />
+                  <input value={coinSettings.upiId || ''} onChange={(event) => setCoinSettings({ ...coinSettings, upiId: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="UPI ID" />
+                  <input value={coinSettings.qrCodeUrl || ''} onChange={(event) => setCoinSettings({ ...coinSettings, qrCodeUrl: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="QR Code URL" />
+                  <input type="number" value={coinSettings.coinRate || 1} onChange={(event) => setCoinSettings({ ...coinSettings, coinRate: Number(event.target.value) })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Coin Rate" />
+                  <input type="password" value={coinSettings.adminPassword || ''} onChange={(event) => setCoinSettings({ ...coinSettings, adminPassword: event.target.value })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Admin Password" />
+                  <input type="number" value={coinSettings.usageRules?.jobPostCoins || 50} onChange={(event) => setCoinSettings({ ...coinSettings, usageRules: { ...coinSettings.usageRules, jobPostCoins: Number(event.target.value) } })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Job Post Coins" />
+                  <input type="number" value={coinSettings.usageRules?.featuredJobCoins || 10} onChange={(event) => setCoinSettings({ ...coinSettings, usageRules: { ...coinSettings.usageRules, featuredJobCoins: Number(event.target.value) } })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Featured Job Coins" />
+                  <input type="number" value={coinSettings.usageRules?.premiumEmployerCoins || 100} onChange={(event) => setCoinSettings({ ...coinSettings, usageRules: { ...coinSettings.usageRules, premiumEmployerCoins: Number(event.target.value) } })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Premium Employer Coins" />
+                  <input type="number" value={coinSettings.usageRules?.advertisementCoins || 200} onChange={(event) => setCoinSettings({ ...coinSettings, usageRules: { ...coinSettings.usageRules, advertisementCoins: Number(event.target.value) } })} className="rounded-2xl border border-slate-200 px-3 py-2 text-sm" placeholder="Advertisement Coins" />
+                  <button onClick={handleCoinSettingsSave} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white md:col-span-2">Save Coin Settings</button>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Wallet History</h3>
+                    <p className="text-sm text-slate-500">Review all coin adds, removes, and adjustments by admin.</p>
+                  </div>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {coinHistory.length ? coinHistory.map((entry) => (
+                    <div key={entry._id || entry.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                      <div className="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900">{entry.reason || entry.action}</p>
+                          <p className="text-slate-500">{entry.adminName || 'Admin'} • {new Date(entry.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div className="text-slate-700">Amount: {entry.amount} • Balance: {entry.newBalance}</div>
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-slate-500">No wallet history yet.</p>}
+                </div>
               </div>
             </section>
           ) : null}

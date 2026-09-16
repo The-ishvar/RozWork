@@ -5,6 +5,7 @@ import Notification from '../models/Notification.js'
 import Payment from '../models/Payment.js'
 import Transaction from '../models/Transaction.js'
 import User from '../models/User.js'
+import CommissionHistory from '../models/CommissionHistory.js'
 
 const buildUserBookingQuery = (userId) => ({
   $or: [{ employerId: userId }, { workerId: userId }, { userId }, { providerId: userId }],
@@ -14,7 +15,8 @@ export const getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user.id
     const role = req.user.role || 'user'
-    const [jobs, bookings, purchases, notifications, viewer, payments, transactions] = await Promise.all([
+    const commissionHistoryQuery = role === 'admin' || role === 'super_admin' ? {} : { $or: [{ employerId: userId }, { workerId: userId }] }
+    const [jobs, bookings, purchases, notifications, viewer, payments, transactions, commissionHistoryRecords] = await Promise.all([
       Job.find({ postedBy: userId }).sort({ createdAt: -1 }).lean(),
       Booking.find(buildUserBookingQuery(userId)).sort({ createdAt: -1 }).lean(),
       Purchase.find({ userId }).sort({ createdAt: -1 }).lean(),
@@ -22,6 +24,7 @@ export const getDashboardStats = async (req, res, next) => {
       User.findById(userId).lean(),
       Payment.find({ $or: [{ workerId: userId }, { employerId: userId }] }).sort({ date: -1 }).lean(),
       Transaction.find({ userId }).sort({ createdAt: -1 }).lean(),
+      CommissionHistory.find(commissionHistoryQuery).sort({ completedAt: -1, createdAt: -1 }).lean(),
     ])
 
     const completedBookings = bookings.filter((booking) => booking.status === 'completed')
@@ -138,6 +141,19 @@ export const getDashboardStats = async (req, res, next) => {
       createdAt: t.createdAt,
     }))
 
+    const commissionHistory = commissionHistoryRecords.slice(0, 10).map((item) => ({
+      id: item._id?.toString?.() || item.id,
+      employerId: item.employerId?.toString?.() || item.employerId,
+      workerId: item.workerId?.toString?.() || item.workerId,
+      bookingId: item.bookingId?.toString?.() || item.bookingId,
+      jobName: item.jobName || 'Booking',
+      jobAmount: Number(item.jobAmount || 0),
+      commissionAmount: Number(item.commissionAmount || 0),
+      coinsDeducted: Number(item.coinsDeducted || 0),
+      status: item.status || 'completed',
+      completedAt: item.completedAt || item.createdAt,
+    }))
+
     return res.json({
       stats,
       recentJobs: jobs.slice(0, 5),
@@ -146,6 +162,7 @@ export const getDashboardStats = async (req, res, next) => {
       notifications,
       earningsHistory,
       recentTransactions,
+      commissionHistory,
     })
   } catch (error) {
     console.error('dashboard.getDashboardStats failed', error)

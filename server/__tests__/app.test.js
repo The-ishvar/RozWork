@@ -247,6 +247,60 @@ describe('RozWork API', () => {
     expect(verifyResponse.body.payment).toBeTruthy()
   })
 
+  it('deducts employer commission from the employer coin wallet and records commission history', async () => {
+    const employerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Rina',
+      email: 'rina-commission@example.com',
+      password: 'secret123',
+      role: 'employer',
+    })
+
+    const workerResponse = await request(app).post('/api/auth/register').send({
+      name: 'Aman',
+      email: 'aman-commission@example.com',
+      password: 'secret123',
+      role: 'worker',
+    })
+
+    const { default: User } = await import('../src/models/User.js')
+    await User.findByIdAndUpdate(employerResponse.body.user.id, { coinBalance: 1000 })
+
+    const bookingResponse = await request(app)
+      .post('/api/bookings')
+      .set('Authorization', `Bearer ${employerResponse.body.token}`)
+      .send({
+        workerId: workerResponse.body.user.id,
+        jobId: 'job_commission_123',
+        price: 2500,
+        category: 'Electrician',
+        serviceTitle: 'Commission test job',
+      })
+
+    await request(app)
+      .patch(`/api/bookings/${bookingResponse.body.booking.id}/accept`)
+      .set('Authorization', `Bearer ${workerResponse.body.token}`)
+
+    await request(app)
+      .patch(`/api/bookings/${bookingResponse.body.booking.id}/complete`)
+      .set('Authorization', `Bearer ${workerResponse.body.token}`)
+
+    const verifyResponse = await request(app)
+      .patch(`/api/bookings/${bookingResponse.body.booking.id}/verify`)
+      .set('Authorization', `Bearer ${employerResponse.body.token}`)
+
+    expect(verifyResponse.status).toBe(200)
+    expect(verifyResponse.body.commissionHistory).toBeTruthy()
+    expect(verifyResponse.body.commissionHistory.commissionAmount).toBe(250)
+    expect(verifyResponse.body.commissionHistory.coinsDeducted).toBe(250)
+
+    const meResponse = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${employerResponse.body.token}`)
+
+    expect(meResponse.status).toBe(200)
+    expect(meResponse.body.user.coinBalance).toBe(750)
+  })
+
   it('charges an application fee and records the payment when a worker applies', async () => {
     const employerResponse = await request(app).post('/api/auth/register').send({
       name: 'Nadia',
@@ -299,14 +353,6 @@ describe('RozWork API', () => {
     expect(premiumResponse.body.user.isPremium).toBe(true)
     expect(premiumResponse.body.user.premiumPlan).toBe('monthly')
     expect(premiumResponse.body.payment.paymentType).toBe('premium_membership')
-  })
-
-  it('returns gallery items through the public API', async () => {
-    const response = await request(app).get('/api/gallery')
-
-    expect(response.status).toBe(200)
-    expect(Array.isArray(response.body.gallery)).toBe(true)
-    expect(response.body.gallery.length).toBeGreaterThan(0)
   })
 
   it('registers a new user', async () => {

@@ -21,10 +21,10 @@ const WorkerProfilePage = lazy(() => import('./pages/WorkerProfilePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const AdminPanelPage = lazy(() => import('./pages/AdminPanelPage'))
-const GalleryPage = lazy(() => import('./pages/GalleryPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const PaymentPage = lazy(() => import('./pages/PaymentPage'))
+const CoinWalletPage = lazy(() => import('./pages/CoinWalletPage'))
 
 const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -83,11 +83,11 @@ const AppRoutes = () => {
               <Route path="/jobs/:id" element={<JobDetailPage />} />
               <Route path="/workers" element={<WorkersPage />} />
               <Route path="/workers/:id" element={<WorkerProfilePage />} />
-              <Route path="/gallery" element={<GalleryPage />} />
               <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/payment/:bookingId" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
+              <Route path="/coins" element={<ProtectedRoute><CoinWalletPage /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/admin" element={<AdminRoute><AdminPanelPage /></AdminRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />

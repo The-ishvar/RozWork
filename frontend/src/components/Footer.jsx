@@ -35,7 +35,6 @@ const Footer = () => {
               {[
                 { to: '/jobs', label: t('nav.jobs', 'Jobs') },
                 { to: '/workers', label: t('nav.workers', 'Workers') },
-                { to: '/gallery', label: t('nav.gallery', 'Gallery') },
                 { to: '/dashboard', label: t('nav.dashboard', 'Dashboard') },
               ].map((link) => (
                 <li key={link.to}>

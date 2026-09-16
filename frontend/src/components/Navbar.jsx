@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Bell, Briefcase, Globe, Home, ImageIcon, LogOut, Menu, Moon,
+  Bell, Briefcase, Globe, Home, LogOut, Menu, Moon,
   MessageCircle, ShieldCheck, SunMedium, Settings, UserRound, Users, X,
-  ChevronDown
+  ChevronDown, Coins
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -20,6 +20,7 @@ const Navbar = () => {
   const bottomNavItems = [
     { to: '/', label: t('nav.home', 'Home'), icon: Home },
     { to: '/jobs', label: t('nav.jobs', 'Jobs'), icon: Briefcase },
+    ...(user ? [{ to: '/coins', label: t('nav.coins', 'Coins'), icon: Coins }] : []),
     { to: user ? '/chat' : '/workers', label: user ? t('nav.chat', 'Chat') : t('nav.workers', 'Workers'), icon: user ? MessageCircle : Users },
     { to: '/workers', label: t('nav.workers', 'Workers'), icon: Users },
     { to: user ? '/profile' : '/login', label: user ? t('nav.profile', 'Profile') : t('common.login', 'Login'), icon: UserRound },
@@ -52,7 +53,7 @@ const Navbar = () => {
                 { to: '/', icon: Home, label: t('nav.home', 'Home') },
                 { to: '/jobs', icon: Briefcase, label: t('nav.jobs', 'Jobs') },
                 { to: '/workers', icon: Users, label: t('nav.workers', 'Workers') },
-                { to: '/gallery', icon: ImageIcon, label: t('nav.gallery', 'Gallery') },
+                ...(user ? [{ to: '/coins', icon: Coins, label: t('nav.coins', 'Coins') }] : []),
                 ...(user ? [{ to: '/chat', icon: MessageCircle, label: t('nav.chat', 'Chat') }] : []),
               ].map((item) => (
                 <NavLink
@@ -161,8 +162,8 @@ const Navbar = () => {
                   { to: '/', icon: Home, label: t('nav.home', 'Home') },
                   { to: '/jobs', icon: Briefcase, label: t('nav.jobs', 'Jobs') },
                   { to: '/workers', icon: Users, label: t('nav.workers', 'Workers') },
-                  { to: '/gallery', icon: ImageIcon, label: t('nav.gallery', 'Gallery') },
                   ...(user ? [
+                    { to: '/coins', icon: Coins, label: t('nav.coins', 'Coins') },
                     { to: '/chat', icon: MessageCircle, label: t('nav.chat', 'Chat') },
                     { to: '/dashboard', icon: Bell, label: t('nav.dashboard', 'Dashboard') },
                     { to: '/profile', icon: UserRound, label: t('nav.profile', 'Profile') },

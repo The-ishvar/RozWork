@@ -1,8 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import dotenv from 'dotenv'
+import './config/env.js'
 import authRoutes from './routes/authRoutes.js'
 import userRoutes from './routes/userRoutes.js'
 import jobRoutes from './routes/jobRoutes.js'
@@ -11,18 +9,24 @@ import bookingRoutes from './routes/bookingRoutes.js'
 import notificationRoutes from './routes/notificationRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
 import dashboardRoutes from './routes/dashboardRoutes.js'
-import galleryRoutes from './routes/galleryRoutes.js'
 import chatRoutes from './routes/chatRoutes.js'
 import paymentRoutes from './routes/paymentRoutes.js'
 import walletRoutes from './routes/walletRoutes.js'
+import productRoutes from './routes/productRoutes.js'
+import reelRoutes from './routes/reelRoutes.js'
+import withdrawalRoutes from './routes/withdrawalRoutes.js'
+import advertisementRoutes from './routes/advertisementRoutes.js'
+import subscriptionPlanRoutes from './routes/subscriptionPlanRoutes.js'
+import analyticsRoutes from './routes/analyticsRoutes.js'
+import reportRoutes from './routes/reportRoutes.js'
+import walletAdminRoutes from './routes/walletAdminRoutes.js'
+import notificationAdminRoutes from './routes/notificationAdminRoutes.js'
+import revenueRoutes from './routes/revenueRoutes.js'
+import auditRoutes from './routes/auditRoutes.js'
+import coinRoutes from './routes/coinRoutes.js'
 import User from './models/User.js'
 import Job from './models/Job.js'
-import { connectToDatabase } from './db/connect.js'
 import { addPlatformListener } from './utils/events.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-dotenv.config({ path: path.resolve(__dirname, '../.env') })
 
 export const app = express()
 
@@ -159,18 +163,36 @@ app.use('/admin', adminRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/dashboard', dashboardRoutes)
 app.use('/api/dashboard', dashboardRoutes)
-app.use('/gallery', galleryRoutes)
-app.use('/api/gallery', galleryRoutes)
 app.use('/chat', chatRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/payments', paymentRoutes)
 app.use('/api/payments', paymentRoutes)
 app.use('/wallet', walletRoutes)
 app.use('/api/wallet', walletRoutes)
-
-connectToDatabase().catch((error) => {
-  console.error('Database connection failed', error)
-})
+app.use('/products', productRoutes)
+app.use('/api/products', productRoutes)
+app.use('/reels', reelRoutes)
+app.use('/api/reels', reelRoutes)
+app.use('/withdrawals', withdrawalRoutes)
+app.use('/api/withdrawals', withdrawalRoutes)
+app.use('/advertisements', advertisementRoutes)
+app.use('/api/advertisements', advertisementRoutes)
+app.use('/subscription-plans', subscriptionPlanRoutes)
+app.use('/api/subscription-plans', subscriptionPlanRoutes)
+app.use('/analytics', analyticsRoutes)
+app.use('/api/analytics', analyticsRoutes)
+app.use('/reports', reportRoutes)
+app.use('/api/reports', reportRoutes)
+app.use('/admin/wallet', walletAdminRoutes)
+app.use('/api/admin/wallet', walletAdminRoutes)
+app.use('/admin/notifications', notificationAdminRoutes)
+app.use('/api/admin/notifications', notificationAdminRoutes)
+app.use('/admin/revenue', revenueRoutes)
+app.use('/api/admin/revenue', revenueRoutes)
+app.use('/admin/audit', auditRoutes)
+app.use('/api/admin/audit', auditRoutes)
+app.use('/coins', coinRoutes)
+app.use('/api/coins', coinRoutes)
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled API error:', err)

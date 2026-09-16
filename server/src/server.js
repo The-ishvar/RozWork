@@ -1,15 +1,9 @@
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { createServer } from 'node:http'
-import dotenv from 'dotenv'
+import './config/env.js'
 import { Server } from 'socket.io'
 import app from './app.js'
 import { connectToDatabase } from './db/connect.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-dotenv.config({ path: path.resolve(__dirname, '../.env') })
+import { ensureAdminAccount } from './script/makeAdmin.js'
 
 const PORT = Number(process.env.PORT) || 5000
 
@@ -89,6 +83,7 @@ const startServer = async () => {
     console.log('Connecting to MongoDB...')
     await connectToDatabase()
     console.log('✅ MongoDB Connected Successfully')
+    await ensureAdminAccount()
   } catch (error) {
     console.error('⚠️ MongoDB not available at startup:', error.message)
   }

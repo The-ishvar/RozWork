@@ -10,7 +10,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "seed": "node src/script/seedDemoData.js",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand"
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

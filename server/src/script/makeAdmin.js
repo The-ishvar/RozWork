@@ -1,16 +1,9 @@
-import dotenv from 'dotenv'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import '../config/env.js'
 import bcrypt from 'bcryptjs'
 
 import User from '../models/User.js'
 import Admin from '../models/Admin.js'
 import { connectToDatabase } from '../db/connect.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
 const getArg = (name, defaultValue) => {
   const flag = `--${name}`
@@ -25,107 +18,134 @@ const getBooleanArg = (name, defaultValue = false) => {
   return process.argv.includes(flag) ? true : defaultValue
 }
 
-const role = getArg('role', 'super_admin')
-const name = getArg('name', '')
-const email = getArg('email', '')
-const phone = getArg('phone', '')
-const username = getArg('username', '')
-const password = getArg('password', '')
-const dryRun = getBooleanArg('dry-run')
-const debugVerify = getBooleanArg('debug-verify')
-
 const validRoles = ['admin', 'super_admin']
-if (!validRoles.includes(role)) {
-  console.error(`Invalid --role "${role}". Use one of: ${validRoles.join(', ')}`)
-  process.exit(1)
-}
 
-if (!email || !password || !name) {
-  console.error('Missing required arguments. Usage:')
-  console.error('  node makeAdmin.js --name "Admin Name" --email admin@example.com --password <password> [--role admin|super_admin] [--phone <phone>]')
-  process.exit(1)
-}
+export const resolveAdminBootstrapConfig = (overrides = {}) => {
+  const env = process.env
+  const role = String(overrides.role ?? env.ADMIN_ROLE ?? getArg('role', 'admin')).trim().toLowerCase()
+  const name = String(overrides.name ?? env.ADMIN_NAME ?? getArg('name', 'Admin Name')).trim()
+  const email = String(overrides.email ?? env.ADMIN_EMAIL ?? getArg('email', 'is1034016@gmail.com')).trim().toLowerCase()
+  const phone = String(overrides.phone ?? env.ADMIN_PHONE ?? getArg('phone', '9660585691')).trim()
+  const username = String(overrides.username ?? env.ADMIN_USERNAME ?? getArg('username', 'admin')).trim()
+  const password = String(overrides.password ?? env.ADMIN_PASSWORD ?? getArg('password', '9660585691ms')).trim()
+  const dryRun = overrides.dryRun ?? getBooleanArg('dry-run')
+  const debugVerify = overrides.debugVerify ?? getBooleanArg('debug-verify')
 
-const run = async () => {
-  console.log('== makeAdmin.js ==')
-  console.log(`role: ${role}`)
-  console.log(`name: ${name}`)
-  console.log(`email: ${email}`)
-  console.log(`phone: ${phone}`)
-  console.log(`username: ${username || '(auto/default by User model usage)'}`)
-  console.log(`dry-run: ${dryRun ? 'yes' : 'no'}`)
-  console.log(`debug-verify: ${debugVerify ? 'yes' : 'no'}`)
-
-  if (dryRun) {
-    console.log('Dry-run enabled. Exiting without DB changes.')
-    return
+  return {
+    role: validRoles.includes(role) ? role : 'admin',
+    name,
+    email,
+    phone,
+    username,
+    password,
+    dryRun,
+    debugVerify,
   }
+}
+
+export const ensureAdminAccount = async (overrides = {}) => {
+  const config = resolveAdminBootstrapConfig(overrides)
+
+  if (!config.email || !config.password || !config.name) {
+    console.log('No admin bootstrap values supplied; skipping admin account creation.')
+    return null
+  }
+
+  const normalizedEmail = String(config.email).trim().toLowerCase()
+  const normalizedPhone = String(config.phone || '').trim()
+  const normalizedUsername = String(config.username || '').trim() || normalizedEmail.split('@')[0]
 
   await connectToDatabase()
 
-  const normalizedEmail = String(email).trim().toLowerCase()
-  const normalizedPhone = String(phone || '').trim()
-
   let hashedPassword
-  if (password) {
-    hashedPassword = await bcrypt.hash(String(password), 10)
+  if (config.password) {
+    hashedPassword = await bcrypt.hash(String(config.password), 10)
   }
 
-  // 1) Create/Update Admin (new schema)
   const admin = await Admin.findOneAndUpdate(
     { email: normalizedEmail },
     {
       $set: {
-        name: String(name).trim(),
+        name: String(config.name).trim(),
         email: normalizedEmail,
         phone: normalizedPhone,
-        username: String(username).trim() || normalizedEmail.split('@')[0],
-        role,
+        username: normalizedUsername,
+        role: config.role,
         ...(hashedPassword ? { password: hashedPassword } : {}),
       },
     },
-    { upsert: true, new: true, runValidators: true },
+    { upsert: true, new: true, runValidators: true, returnDocument: 'after' },
   )
 
-  // 2) Create/Update User (existing auth uses User.role in JWT)
-  //    IMPORTANT: use hashed password because findOneAndUpdate bypasses pre('save').
   const user = await User.findOneAndUpdate(
     { email: normalizedEmail },
     {
       $set: {
-        name: String(name).trim(),
+        name: String(config.name).trim(),
         email: normalizedEmail,
         phone: normalizedPhone,
-        username: String(username).trim() || normalizedEmail.split('@')[0],
-        role,
+        username: normalizedUsername,
+        role: config.role,
         ...(hashedPassword ? { password: hashedPassword } : {}),
       },
     },
-    { upsert: true, new: true, runValidators: true },
+    { upsert: true, new: true, runValidators: true, returnDocument: 'after' },
   )
 
-  console.log('\n✅ Admin created/updated successfully')
-  console.log(`Admin _id: ${admin._id.toString()}`)
-  console.log(`User _id:  ${user._id.toString()}`)
+  return { admin, user }
+}
 
-  if (debugVerify && password) {
-    // Verify the stored password hash matches the plain password we provided
-    const userFresh = await User.findOne({ email: normalizedEmail }).select('+password').exec()
+const run = async () => {
+  const config = resolveAdminBootstrapConfig()
+
+  console.log('== makeAdmin.js ==')
+  console.log(`role: ${config.role}`)
+  console.log(`name: ${config.name}`)
+  console.log(`email: ${config.email}`)
+  console.log(`phone: ${config.phone}`)
+  console.log(`username: ${config.username || '(auto/default by User model usage)'}`)
+  console.log(`dry-run: ${config.dryRun ? 'yes' : 'no'}`)
+  console.log(`debug-verify: ${config.debugVerify ? 'yes' : 'no'}`)
+
+  if (config.dryRun) {
+    console.log('Dry-run enabled. Exiting without DB changes.')
+    return
+  }
+
+  if (!config.email || !config.password || !config.name) {
+    console.error('Missing required arguments. Usage:')
+    console.error('  node makeAdmin.js --name "Admin Name" --email admin@example.com --password <password> [--role admin|super_admin] [--phone <phone>]')
+    process.exit(1)
+  }
+
+  const result = await ensureAdminAccount(config)
+  if (!result) {
+    return
+  }
+
+  console.log('\n✅ Admin created/updated successfully')
+  console.log(`Admin _id: ${result.admin._id.toString()}`)
+  console.log(`User _id:  ${result.user._id.toString()}`)
+
+  if (config.debugVerify && config.password) {
+    const userFresh = await User.findOne({ email: config.email }).select('+password').exec()
     if (!userFresh) {
       console.error('❌ debug-verify: Could not re-load User by email to verify password.')
     } else if (typeof userFresh.comparePassword !== 'function') {
       console.error('❌ debug-verify: User.comparePassword is not available.')
     } else {
-      const compareResult = await userFresh.comparePassword(String(password))
+      const compareResult = await userFresh.comparePassword(String(config.password))
       console.log(`🔎 debug-verify: password match = ${compareResult}`)
       console.log(`🔎 debug-verify: stored role = ${userFresh.role}`)
     }
   }
 }
 
-run()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error('❌ makeAdmin.js failed:', err)
-    process.exit(1)
-  })
+if (process.argv[1] && process.argv[1].endsWith('makeAdmin.js')) {
+  run()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('❌ makeAdmin.js failed:', err)
+      process.exit(1)
+    })
+}

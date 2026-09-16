@@ -4,9 +4,11 @@ import Notification from '../models/Notification.js'
 import Payment from '../models/Payment.js'
 import User from '../models/User.js'
 import Setting from '../models/Setting.js'
+import CoinTransaction from '../models/CoinTransaction.js'
 import { createNotification, notifyAdmins } from '../utils/notify.js'
 import { recordUserActivity } from '../utils/activity.js'
 import { emitPlatformEvent } from '../utils/events.js'
+import { loadCoinSettings, ensureUserWallet } from '../utils/coinSystem.js'
 
 const defaultPlatformSettings = {
   platformCommission: 5,
@@ -127,6 +129,30 @@ export const createJob = async (req, res, next) => {
       return res.status(403).json({ message: 'Only employers and admins can publish jobs.' })
     }
 
+    const isAdmin = ['admin', 'super_admin'].includes(req.user?.role)
+    const coinSettings = await loadCoinSettings()
+    const jobPostCoins = Number(coinSettings.usageRules?.jobPostCoins || 10)
+    const freePostLimit = Number(coinSettings.freePostLimit || 3)
+
+    if (!isAdmin) {
+      const employer = await ensureUserWallet(req.user.id)
+      if (!employer) return res.status(404).json({ message: 'User not found' })
+
+      const freePostsUsed = Number(employer.freePostsUsed || 0)
+      const coinBalance = Number(employer.coinBalance || 0)
+
+      if (freePostsUsed >= freePostLimit && coinBalance < jobPostCoins) {
+        return res.status(400).json({
+          message: `Insufficient coins. You need ${jobPostCoins} coins to post a job. You have ${coinBalance} coins. Please buy more coins.`,
+          code: 'INSUFFICIENT_COINS',
+          coinBalance,
+          required: jobPostCoins,
+          freePostsUsed,
+          freePostLimit,
+        })
+      }
+    }
+
     const job = await Job.create({
       title: req.body.title?.trim(),
       category: inferCategoryFromRequest(req.body),
@@ -145,6 +171,46 @@ export const createJob = async (req, res, next) => {
       status: req.body.status || 'approved',
       goalTags: Array.isArray(req.body.goalTags) ? req.body.goalTags : [],
     })
+
+    if (!isAdmin) {
+      const employer = await User.findById(req.user.id)
+      const freePostsUsed = Number(employer.freePostsUsed || 0)
+      const coinBalance = Number(employer.coinBalance || 0)
+
+      if (freePostsUsed < freePostLimit) {
+        employer.freePostsUsed = freePostsUsed + 1
+        await employer.save({ validateBeforeSave: false })
+
+        await CoinTransaction.create({
+          userId: employer._id,
+          type: 'usage',
+          amount: 0,
+          balanceAfter: coinBalance,
+          reason: `Free job post used (${freePostsUsed + 1}/${freePostLimit})`,
+          referenceId: job._id,
+          referenceType: 'Job',
+          status: 'completed',
+        })
+      } else {
+        const previousBalance = coinBalance
+        const newBalance = previousBalance - jobPostCoins
+
+        employer.coinBalance = newBalance
+        employer.totalUsedCoins = Number(employer.totalUsedCoins || 0) + jobPostCoins
+        await employer.save({ validateBeforeSave: false })
+
+        await CoinTransaction.create({
+          userId: employer._id,
+          type: 'usage',
+          amount: -jobPostCoins,
+          balanceAfter: newBalance,
+          reason: `Job post published: ${job.title}`,
+          referenceId: job._id,
+          referenceType: 'Job',
+          status: 'completed',
+        })
+      }
+    }
 
     const actorName = req.user?.name || req.body.postedByName || 'A member'
     const actorId = req.user?.id || req.body.postedBy || null
@@ -179,7 +245,16 @@ export const createJob = async (req, res, next) => {
       }),
     ])
 
-    return res.status(201).json({ job: serializeJob(job) })
+    const updatedEmployer = !isAdmin ? await User.findById(req.user.id).lean() : null
+
+    return res.status(201).json({
+      job: serializeJob(job),
+      coinInfo: updatedEmployer ? {
+        coinBalance: Number(updatedEmployer.coinBalance || 0),
+        freePostsUsed: Number(updatedEmployer.freePostsUsed || 0),
+        freePostLimit,
+      } : undefined,
+    })
   } catch (error) {
     console.error('jobs.create failed', error)
     next(error)

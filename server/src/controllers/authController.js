@@ -16,6 +16,39 @@ const normalizeEmail = (value) => String(value || '').trim().toLowerCase()
 const normalizePhone = (value) => String(value || '').trim()
 const normalizeUsername = (value) => String(value || '').trim()
 
+const getPhoneDigits = (value) => String(value || '').replace(/\D/g, '')
+
+const getPhoneCandidates = (value) => {
+  const digits = getPhoneDigits(value)
+  if (!digits) {
+    return []
+  }
+
+  const candidates = new Set([digits])
+
+  if (digits.length > 10) {
+    candidates.add(digits.slice(-10))
+  }
+
+  if (/^([6-9]\d{9}|91[6-9]\d{9})$/.test(digits)) {
+    candidates.add(digits.slice(-10))
+    candidates.add(`91${digits.slice(-10)}`)
+  }
+
+  return [...candidates]
+}
+
+const getPhonePatterns = (value) => {
+  const digits = getPhoneDigits(value)
+  if (!digits) {
+    return []
+  }
+
+  return getPhoneCandidates(value).map((candidate) => candidate.split('').map((char) => `${char}[^0-9]*`).join(''))
+}
+
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 const getClientMeta = (req) => {
   const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0]?.trim()
   return {
@@ -41,8 +74,6 @@ const buildUsernameFromIdentity = (name, email, phone) => {
 
   return source.toLowerCase().replace(/[^a-z0-9]+/g, '')
 }
-
-const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const createToken = (user) =>
   jwt.sign({ id: user._id.toString(), email: user.email, role: user.role }, getJwtSecret(), {
@@ -121,7 +152,14 @@ export const register = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'A valid email or phone number is required', code: 'VALIDATION_ERROR' })
     }
 
-    const existingUser = await User.findOne({ $or: [{ email: resolvedEmail }, ...(normalizedPhone ? [{ phone: normalizedPhone }] : []), ...(normalizedUsername ? [{ username: normalizedUsername }] : [])] })
+    const phoneChecks = normalizedPhone
+      ? [
+          ...getPhoneCandidates(normalizedPhone).map((phone) => ({ phone })),
+          ...getPhonePatterns(normalizedPhone).map((pattern) => ({ phone: { $regex: pattern } })),
+        ]
+      : []
+
+    const existingUser = await User.findOne({ $or: [{ email: resolvedEmail }, ...phoneChecks, ...(normalizedUsername ? [{ username: normalizedUsername }] : [])] })
     if (existingUser) {
       return res.status(409).json({ success: false, message: 'User already exists', code: 'USER_EXISTS' })
     }
@@ -187,35 +225,22 @@ export const login = async (req, res, next) => {
     const { identifier, email, password } = req.body
     const loginIdentifier = String(identifier || email || '').trim()
 
-    console.log('auth.login input', {
-      identifierPresent: identifier !== undefined && identifier !== null,
-      identifierValue: identifier,
-      emailPresent: email !== undefined && email !== null,
-      emailValue: email,
-      loginIdentifier,
-      passwordPresent: password !== undefined && password !== null,
-    })
-
     if (!loginIdentifier || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required', code: 'VALIDATION_ERROR' })
     }
 
     const normalizedIdentifier = loginIdentifier.trim()
+    const phoneCandidates = getPhoneCandidates(normalizedIdentifier)
+    const phonePatterns = getPhonePatterns(normalizedIdentifier)
+
     const user = await User.findOne({
       $or: [
         { email: normalizeEmail(normalizedIdentifier) },
         { phone: normalizedIdentifier },
+        ...phoneCandidates.map((phone) => ({ phone })),
+        ...phonePatterns.map((pattern) => ({ phone: { $regex: pattern } })),
         { username: { $regex: `^${escapeRegExp(normalizedIdentifier)}$`, $options: 'i' } },
       ],
-    })
-
-    console.log('auth.login resolved user', {
-      found: !!user,
-      userId: user?._id?.toString(),
-      email: user?.email,
-      phone: user?.phone,
-      username: user?.username,
-      role: user?.role,
     })
 
     if (!user) {
@@ -223,7 +248,6 @@ export const login = async (req, res, next) => {
     }
 
     const isValidPassword = await user.comparePassword(password)
-    console.log('auth.login comparePassword', { isValidPassword })
 
     if (!isValidPassword) {
       return res.status(401).json({ success: false, message: 'Invalid credentials', code: 'INVALID_CREDENTIALS' })
@@ -307,7 +331,13 @@ export const forgotPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Phone number is required', code: 'VALIDATION_ERROR' })
     }
 
-    const user = await User.findOne({ phone: String(phone).trim() })
+    const user = await User.findOne({
+      $or: [
+        { phone: String(phone).trim() },
+        ...getPhoneCandidates(phone).map((candidate) => ({ phone: candidate })),
+        ...getPhonePatterns(phone).map((pattern) => ({ phone: { $regex: pattern } })),
+      ],
+    })
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found', code: 'USER_NOT_FOUND' })
     }
@@ -315,7 +345,7 @@ export const forgotPassword = async (req, res, next) => {
     const otp = `${Math.floor(100000 + Math.random() * 900000)}`
     otpStore.set(String(phone).trim(), { otp, expiresAt: Date.now() + 5 * 60 * 1000, verified: false })
 
-    return res.json({ success: true, message: 'OTP sent successfully', otp })
+    return res.json({ success: true, message: 'OTP sent successfully' })
   } catch (error) {
     console.error('auth.forgotPassword failed', error)
     return res.status(500).json({ success: false, message: error.message || 'Unable to send OTP', code: 'OTP_FAILED' })
@@ -364,7 +394,13 @@ export const resetPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid OTP', code: 'OTP_INVALID' })
     }
 
-    const user = await User.findOne({ phone: String(phone).trim() })
+    const user = await User.findOne({
+      $or: [
+        { phone: String(phone).trim() },
+        ...getPhoneCandidates(phone).map((candidate) => ({ phone: candidate })),
+        ...getPhonePatterns(phone).map((pattern) => ({ phone: { $regex: pattern } })),
+      ],
+    })
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found', code: 'USER_NOT_FOUND' })
     }
