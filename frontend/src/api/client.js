@@ -16,6 +16,10 @@ const normalizeConfiguredUrl = (value) => {
 }
 
 const resolveApiBaseUrl = () => {
+  if (import.meta.env.PROD) {
+    return DEFAULT_API_URL
+  }
+
   const configuredUrl = normalizeConfiguredUrl(
     import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_API_BASE_URL,
@@ -36,10 +40,6 @@ const resolveApiBaseUrl = () => {
 
       return DEFAULT_API_URL
     }
-  }
-
-  if (import.meta.env.PROD) {
-    return DEFAULT_API_URL
   }
 
   if (typeof window !== 'undefined' && window.location?.origin) {
